@@ -23,27 +23,6 @@ app = FastAPI(title="Yapify WebRTC Voice")
 logger = logging.getLogger("yapify.example.webrtc")
 
 
-def create_yapper() -> YapWrap:
-    """Create a separate agent and voice components for each connection."""
-    from agno.agent import Agent
-    from agno.models.google import Gemini
-
-    agent = Agent(
-        model=Gemini(
-            id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
-            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
-        ),
-        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
-        markdown=False,
-    )
-    return YapWrap(
-        agent=AgnoAgent(agent),
-        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
-        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
-        vad=SileroVAD(),
-    )
-
-
 @app.get("/", response_class=HTMLResponse)
 async def index():
     html = Path(__file__).with_name("voice-client.html").read_text(encoding="utf-8")
@@ -87,7 +66,24 @@ async def offer(websocket: WebSocket):
         pc.addTrack(transport.create_output_track())
         await pc.setLocalDescription(await pc.createAnswer())
         await websocket.send_json({"type": "answer", "sdp": pc.localDescription.sdp})
-        voice = asyncio.create_task(create_yapper().run(transport))
+        from agno.agent import Agent
+        from agno.models.google import Gemini
+
+        agent = Agent(
+            model=Gemini(
+                id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+                api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+            ),
+            instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+            markdown=False,
+        )
+        yapper = YapWrap(
+            agent=AgnoAgent(agent),
+            stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+            tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+            vad=SileroVAD(),
+        )
+        voice = asyncio.create_task(yapper.run(transport))
         tasks = [voice, asyncio.create_task(websocket.receive()), asyncio.create_task(ended.wait())]
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         if voice in done:

@@ -1,4 +1,6 @@
 import importlib
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,14 +51,14 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
     monkeypatch.setenv("CARTESIA_API_KEY", "test-no-network")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-no-network")
     wrappers = []
-    create = example.create_yapper
+    wrapper_class = example.YapWrap
 
-    def factory():
-        wrapper = create()
+    def record_wrapper(**kwargs):
+        wrapper = wrapper_class(**kwargs)
         wrappers.append(wrapper)
         return wrapper
 
-    monkeypatch.setattr(example, "create_yapper", factory)
+    monkeypatch.setattr(example, "YapWrap", record_wrapper)
     with TestClient(example.app) as client:
         for _ in range(2):
             with client.websocket_connect("/ws/voice") as ws:
@@ -70,15 +72,17 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
 
 
 def test_browser_receives_conversation_text_and_audio(monkeypatch):
-    from yapify import YapWrap
     from tests.conftest import MockAgent, MockSTT, MockTTS, MockVAD
 
     monkeypatch.setenv("DEEPGRAM_API_KEY", "test-no-network")
     monkeypatch.setenv("CARTESIA_API_KEY", "test-no-network")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-no-network")
-    monkeypatch.setattr(example, "create_yapper", lambda: YapWrap(
-        MockAgent("Hello there."), MockTTS(), MockSTT("hello"), MockVAD(["start", "stop"]),
-    ))
+    monkeypatch.setitem(sys.modules, "agno.agent", SimpleNamespace(Agent=SimpleNamespace))
+    monkeypatch.setitem(sys.modules, "agno.models.google", SimpleNamespace(Gemini=SimpleNamespace))
+    monkeypatch.setattr(example, "AgnoAgent", lambda agent: MockAgent("Hello there."))
+    monkeypatch.setattr(example, "DeepgramSTT", lambda **kwargs: MockSTT("hello"))
+    monkeypatch.setattr(example, "CartesiaTTS", lambda **kwargs: MockTTS())
+    monkeypatch.setattr(example, "SileroVAD", lambda: MockVAD(["start", "stop"]))
     import json
     with TestClient(example.app) as client:
         with client.websocket_connect("/ws/voice") as ws:

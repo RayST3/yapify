@@ -25,27 +25,6 @@ app = FastAPI(title="Yapify Voice Server")
 logger = logging.getLogger("yapify.example")
 
 
-def create_yapper() -> YapWrap:
-    """Create a separate agent and voice components for each connection."""
-    from agno.agent import Agent
-    from agno.models.google import Gemini
-
-    agent = Agent(
-        model=Gemini(
-            id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
-            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
-        ),
-        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
-        markdown=False,
-    )
-    return YapWrap(
-        agent=AgnoAgent(agent),
-        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
-        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
-        vad=SileroVAD(),
-    )
-
-
 @app.websocket("/ws/voice")
 async def voice_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -57,7 +36,24 @@ async def voice_endpoint(websocket: WebSocket):
         await websocket.close(code=1011)
         return
     try:
-        await create_yapper().server_ws(ws=websocket)
+        from agno.agent import Agent
+        from agno.models.google import Gemini
+
+        agent = Agent(
+            model=Gemini(
+                id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+                api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+            ),
+            instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+            markdown=False,
+        )
+        yapper = YapWrap(
+            agent=AgnoAgent(agent),
+            stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+            tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+            vad=SileroVAD(),
+        )
+        await yapper.server_ws(ws=websocket)
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
     except WebSocketDisconnect:

@@ -1,292 +1,285 @@
-# Yapify
+# Introducing Yapify
 
-A Python voice pipeline with pluggable agent, speech providers, and transport.
-Python 3.10 or later is required.
+**Make your agents yap.**
 
-```text
-PCM input -> VAD -> streaming STT -> agent events -> phrase chunking -> TTS -> PCM output
-```
+Give the agent you've already built a voice. Yapify connects your existing
+Python agent to speech recognition, speech synthesis, and live audio—so people
+can talk to it.
 
-The core imports no Agno, FastAPI, device, or model SDK. Every component inherits
-an explicit abstract base class: `BaseAgent`, `BaseSTT`, `BaseTTS`, `BaseVAD`, or
-`BaseTransport`. `CallableAgent` adapts ordinary Python functions and streams;
-`AgnoAgent` adapts an existing Agno agent.
+You've chosen a framework, configured a model, connected tools, and worked out
+memory and workflows. Yapify starts with that agent. Wrap it in an adapter,
+choose your speech providers, and turn it into a yapper.
 
-## Run the browser example
+Built-in adapters cover **Agno, Claude Agent SDK, CrewAI, Google ADK,
+Hugging Face smolagents, LangGraph / LangChain agents, LlamaIndex,
+Microsoft Agent Framework, OpenAI Agents SDK, and Pydantic AI**.
+Custom Python agents can connect through `CallableAgent` or a `BaseAgent` subclass.
+See [every adapter and its example](#bring-your-framework).
 
-From this checkout in PowerShell:
-
-```powershell
-uv sync --group examples --extra web --extra silero --extra deepgram --extra cartesia
-$env:DEEPGRAM_API_KEY = "your-deepgram-key"
-$env:CARTESIA_API_KEY = "your-cartesia-key"
-$env:GOOGLE_API_KEY = "your-google-key"
-uv run python -m examples.transports.fastapi_websocket
-```
-
-Open <http://localhost:8000>, allow microphone access, and start a call. The
-server also supports `uv run uvicorn examples.transports.fastapi_websocket:app --reload`.
-The example uses an Agno agent with Gemini, Deepgram Nova transcription, and
-Cartesia speech synthesis. All three provider keys are required; `GEMINI_API_KEY`
-is also accepted in place of `GOOGLE_API_KEY`. `GEMINI_MODEL` overrides the model
-ID (default `gemini-flash-lite-latest`). There is no echo fallback in this example.
-
-The `examples` dependency group installs Agno and Google's model SDK for this
-checkout. Every transport example uses `AgnoAgent` and Gemini Flash Lite by
-default. [Framework examples](examples/frameworks) cover all supported adapters,
-including a plain callable. [Transport examples](examples/transports) cover
-local audio, standalone WebSockets, FastAPI WebSockets, and WebRTC. See the
-[example guide](examples/README.md) for dependencies, credentials, and commands.
-
-`web` installs FastAPI, Uvicorn, and websockets. `silero` installs the actual
-Silero model package and its runtime dependencies. Installing only the base
-package does not install these integrations. Silero buffers 20 ms pipeline
-frames into the 512-sample windows required by its 16 kHz model.
-
-The client captures mono PCM16 with an AudioWorklet, schedules output chunks in
-order, and clears queued playback on interruption. Each connection receives a
-new wrapper, VAD, providers, and history. Missing keys and session failures are
-reported to the client, with error details in the server log.
-
-The conversation panel shows your recognized words as they arrive and streams
-the agent's reply into a separate message. Final transcript updates replace the
-interim text, and interrupted replies are labeled. The transcript stays visible
-after a call ends and clears when you start a new call.
-
-## Install as a separate package
-
-The project builds a regular wheel; it does not depend on an Agno checkout.
-
-```powershell
-python -m pip install -e ".[web,silero,deepgram,cartesia]"
-# To run the Agno examples when installing with pip:
-python -m pip install "agno>=3.1.5" "google-genai>=2.31.0"
-# Or build a distributable artifact:
-uv build
-# Then, in another environment:
-python -m pip install "dist/yapify-0.1.0-py3-none-any.whl[web,silero,deepgram,cartesia]"
-```
-
-Select only the extras needed by your application:
-
-| Extra | Purpose |
-| --- | --- |
-| `web` | FastAPI browser example |
-| `websockets` | Standalone WebSocket server |
-| `local` | Microphone and speakers via sounddevice |
-| `silero` | Neural voice activity detection |
-| `deepgram`, `cartesia` | Providers used in the examples |
-| `audio` | Optional NumPy acceleration |
-| `webrtc`, `webrtc-vad`, `openai`, `elevenlabs` | Additional integration dependencies |
-
-Agent SDKs are installed separately (or with `uv sync --group examples` for
-the Agno/Gemini examples). `all` includes the listed runtime extras
-except `webrtc-vad`; it does not install every third-party agent/provider SDK.
-
-## Use any agent and transport
+Start with any framework—or your own agent implementation. Here, `reply` is
+your application's function that accepts user text and returns reply text or
+a stream of text chunks:
 
 ```python
+import asyncio
+
 from yapify import YapWrap
 from yapify.agents import CallableAgent
 from yapify.stt import DeepgramSTT
 from yapify.tts import CartesiaTTS
-from yapify.vad import EnergyVAD
+from yapify.vad import SileroVAD
 
-async def reply(text: str):
-    yield f"You said: {text}"
+from your_app import reply  # Your existing agent's text-in, text-out entry point.
 
 yapper = YapWrap(
     agent=CallableAgent(reply),
     stt=DeepgramSTT(),
     tts=CartesiaTTS(),
-    vad=EnergyVAD(),
+    vad=SileroVAD(),
 )
 
-# In an async entry point, choose one:
-await yapper.startlocal()                 # requires the local extra
-await yapper.server_ws(ws=accepted_ws)    # socket accepted by your application
-await yapper.run(your_transport)          # no web framework required
+asyncio.run(yapper.startlocal())
 ```
 
-Local sessions print the conversation automatically, including the Agno and
-other framework examples:
+Your function keeps calling your agent with its configured model, instructions,
+tools, and session state. It can be synchronous or asynchronous. Yapify handles
+listening and speaking.
+
+You can also wrap framework objects directly with a [built-in adapter](#bring-your-framework).
+Install the voice dependencies below and keep your agent's own credentials and
+session configuration.
+
+**[Try it locally](#get-talking) · [Try it in your browser](#choose-where-your-agent-yaps) · [Find your framework](#bring-your-framework) · [Build an adapter](#make-it-your-own)**
+
+## Why Yapify?
+
+Adding voice to an existing agent brings a new set of concerns: microphone
+input, speech recognition, turn detection, audio playback, interruptions, and
+keeping the conversation visible. Reusing an agent also means connecting its
+input, output, and session state to that voice pipeline.
+
+Yapify puts that connection at the center of its API:
+
+- **Bring your agent.** Use an adapter around your configured agent, graph,
+  runner, or client. Your framework continues to execute its tools and workflows.
+- **Choose your speech stack.** Configure STT, TTS, and voice activity detection
+  independently of the agent.
+- **Handle conversation turns.** Detect speech, turn reply text into spoken
+  phrases, and clear queued playback when the user interrupts.
+- **Talk locally or in a browser.** Use microphone and speakers, WebSockets,
+  FastAPI, or WebRTC. The included clients show both sides of the conversation.
+- **Extend through base classes.** Add an agent, provider, or transport by
+  implementing a small, explicit interface.
+
+The core imports no agent framework, web framework, audio device, or model SDK.
+Integrations are optional.
 
 ```text
-You: What can you help me with?
-Agent: I can answer questions and help you plan. [interrupted]
-You: Tell me about the weather.
-Agent: Which city are you in?
+Your voice → speech recognition → your existing agent → speech synthesis → its voice
 ```
 
-User lines print once recognition finishes; agent text streams as it is
-generated. Use `await yapper.startlocal(show_transcripts=False)` for audio only.
+## Get talking
 
-A custom transport subclasses `BaseTransport` and implements three methods:
+Python 3.10+ is required by Yapify; individual framework SDKs can require a newer
+version. From the repository root, install the example dependencies:
 
-```python
-from yapify import BaseTransport
-
-class MyTransport(BaseTransport):
-    async def audio_in(self):
-        # Yield raw PCM16 mono bytes until the connection ends.
-        yield ...
-
-    async def send_audio(self, pcm: bytes) -> None:
-        ...
-
-    async def stop_playback(self) -> None:
-        ...
+```sh
+uv sync --group examples --extra local --extra web --extra silero --extra deepgram --extra cartesia
 ```
 
-All components use signed little-endian PCM16 mono at the same sample rate
-(default 16 kHz). Incoming chunks may have arbitrary sizes; the session frames
-them into 20 ms blocks. Components declaring a different `sample_rate` are
-rejected rather than silently changing audio speed. Raw PCM has no WAV header.
+Set your provider keys. The demos use Agno with Gemini, Deepgram for recognition,
+Cartesia for speech, and Silero for voice activity detection.
 
-For a standalone WebSocket server, use `await yapper.server_ws()`. To handle
-concurrent connections, pass `session_factory=create_yapper`, where the factory
-constructs independent components. A single wrapper cannot serve concurrent
-calls. Applications own authentication, socket acceptance, and connection setup.
-
-Transports can override `async send_event(event: SessionEvent)` to receive
-conversation text. `BaseTransport` supplies a no-op implementation for
-audio-only transports. WebSocket clients receive JSON alongside PCM:
-
-```json
-{"type": "transcript", "data": {"turn_id": 1, "text": "Hello", "is_final": true}, "timestamp": 0.0}
-{"type": "agent_delta", "data": {"turn_id": 1, "text": "Hi there!"}, "timestamp": 0.0}
-{"type": "agent_complete", "data": {"turn_id": 1, "text": "Hi there!", "status": "completed"}, "timestamp": 0.0}
+```sh
+export GOOGLE_API_KEY="your-google-key"
+export DEEPGRAM_API_KEY="your-deepgram-key"
+export CARTESIA_API_KEY="your-cartesia-key"
 ```
 
-Transcript messages contain the whole recognized turn so far; agent deltas are
-appended. `agent_complete` contains the whole generated reply and a status of
-`completed`, `interrupted`, or `error`. Speech boundary events also include the
-turn ID. These are recognized/generated words, not a record of audio actually
-heard by the listener.
+<details>
+<summary>PowerShell</summary>
 
-## Add your own component
+```powershell
+$env:GOOGLE_API_KEY = "your-google-key"
+$env:DEEPGRAM_API_KEY = "your-deepgram-key"
+$env:CARTESIA_API_KEY = "your-cartesia-key"
+```
 
-Start with [the base classes](src/yapify/core/base.py). Each class defines the
-methods a component must implement and the data those methods receive and yield.
-The session connects these components; provider-specific SDK calls stay inside
-the subclasses.
+</details>
 
-| Base class | Required methods | Input → output |
+Start a local conversation:
+
+```sh
+uv run python -m examples.transports.local
+```
+
+Wait for `Session online`, then speak. The terminal prints your recognized
+words and streams the agent's reply. Press Ctrl+C to stop.
+
+`GEMINI_API_KEY` is also accepted. Set `GEMINI_MODEL` to change the example model;
+the default is `gemini-flash-lite-latest`. These are example defaults—you choose
+the model and providers in your own application.
+
+For an application using this checkout, install only the integrations you need:
+
+```sh
+python -m pip install -e ".[local,silero,deepgram,cartesia]"
+```
+
+Install your agent's framework and model SDK separately. This command installs
+Yapify's voice dependencies; the `examples` group above also installs Agno and
+Google's model SDK. See the [example guide](examples/README.md) for other setups.
+
+## Choose where your agent yaps
+
+| Experience | Example | Run from the repository root |
 | --- | --- | --- |
-| `BaseAgent` | `respond(text)` | User text → `AgentEvent` stream |
-| `BaseSTT` | `transcribe(audio)` | PCM audio stream → transcript stream |
-| `BaseTTS` | `synthesize(text)` | Reply phrase → PCM audio stream |
-| `BaseVAD` | `process(pcm)` | PCM frame → `"start"`, `"stop"`, or `None` |
-| `BaseTransport` | `audio_in()`, `send_audio(pcm)`, `stop_playback()` | Connect incoming audio and outgoing playback |
+| Microphone, speakers, and terminal transcript | [Local audio](examples/transports/local.py) | `uv run python -m examples.transports.local` |
+| Browser voice chat and transcript | [FastAPI WebSocket](examples/transports/fastapi_websocket.py) | `uv run python -m examples.transports.fastapi_websocket` |
+| A socket for your own client | [Standalone WebSocket](examples/transports/websocket.py) | `uv run python -m examples.transports.websocket` |
+| Browser audio over WebRTC | [WebRTC](examples/transports/webrtc.py) | `uv run --extra webrtc python -m examples.transports.webrtc` |
 
-For example, this is a complete custom agent:
+For either browser server, open <http://localhost:8000>, allow microphone access,
+and start a call. Run one at a time; both use port 8000. The standalone socket
+listens on port 8765; its [browser client instructions](examples/README.md#transport-examples)
+show how to serve the HTML separately.
+
+Every example contains an explicit `yapper = YapWrap(...)`. Server examples
+construct it inside the connection handler, giving each call its own agent,
+speech components, and conversation state.
+
+In your application, choose the matching entry point:
+
+- `await yapper.startlocal()` for microphone and speakers.
+- `await yapper.server_ws(ws=websocket)` for an accepted WebSocket connection.
+- `await yapper.run(transport)` for a `BaseTransport` implementation.
+
+A single `YapWrap` instance serves one conversation at a time.
+
+## Bring your framework
+
+Built-in adapters connect these Python agent APIs. Each linked example shows
+the required SDK dependencies, object types, and session setup.
+
+| Your agent | Yapify adapter | Example |
+| --- | --- | --- |
+| Agno | `AgnoAgent` | [Agno](examples/frameworks/agno_agent.py) |
+| LangGraph / LangChain agents | `LangGraphAgent` | [LangGraph](examples/frameworks/langgraph_agent.py) |
+| Pydantic AI | `PydanticAIAgent` | [Pydantic AI](examples/frameworks/pydantic_ai_agent.py) |
+| OpenAI Agents SDK | `OpenAIAgentsSDKAgent` | [OpenAI Agents](examples/frameworks/openai_agents_sdk.py) |
+| Google ADK | `GoogleADKAgent` | [Google ADK](examples/frameworks/google_adk_agent.py) |
+| Claude Agent SDK | `ClaudeAgentSDKAgent` | [Claude Agent SDK](examples/frameworks/claude_agent_sdk.py) |
+| CrewAI | `CrewAIAgent` | [CrewAI](examples/frameworks/crewai_agent.py) |
+| LlamaIndex | `LlamaIndexAgent` | [LlamaIndex](examples/frameworks/llamaindex_agent.py) |
+| Microsoft Agent Framework | `MicrosoftAgentFrameworkAgent` | [Microsoft Agent Framework](examples/frameworks/microsoft_agent.py) |
+| Hugging Face smolagents | `SmolAgentsAgent` | [smolagents](examples/frameworks/smolagents_agent.py) |
+| Your own Python function or stream | `CallableAgent` | [Callable](examples/frameworks/callable_agent.py) |
+
+Adapters translate recognized text into framework calls and reply text into
+Yapify events. They work with the interfaces shown in the examples; arbitrary
+graph inputs, structured outputs, or application-specific events may need a
+custom adapter. CrewAI and smolagents currently speak the final answer.
+
+### Keep your framework's memory
+
+Continue using your framework's session, history, and persistence mechanisms.
+Pass the relevant run options through its adapter—for example, an Agno
+`session_id`, a LangGraph `config` with a `thread_id`, or a LlamaIndex `ctx`.
+
+Yapify does not automatically migrate or populate agent memory. Its
+`yapper.memory` records generated conversation turns and interruptions.
+Your application decides which framework session each voice conversation uses.
+
+## Where Yapify fits
+
+Pipecat and LiveKit can also connect existing agent logic.
+[Pipecat includes a LangChain processor](https://github.com/pipecat-ai/pipecat/blob/main/src/pipecat/processors/frameworks/langchain.py),
+and [LiveKit provides a LangGraph/LangChain adapter](https://docs.livekit.io/agents/models/llm/langchain/).
+
+Yapify focuses on a direct Python integration: take an existing agent, wrap its
+text interface, choose speech components, and run it through a transport.
+It's built for developers who want to add voice while continuing to own their
+agent's framework, tools, and session setup.
+
+## Make it your own
+
+Have an agent with a custom API? Use `CallableAgent` for a function that accepts
+text and returns text or a stream of text. For more control, subclass `BaseAgent`:
 
 ```python
 from collections.abc import AsyncIterator
-from yapify import BaseAgent, AgentEvent
+
+from yapify import AgentEvent, BaseAgent
 
 class MyAgent(BaseAgent):
-    async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
-        yield AgentEvent.text("You said: ")
-        yield AgentEvent.text(text)
+    def __init__(self, existing_agent):
+        self.existing_agent = existing_agent
 
-# Pass MyAgent() as the agent argument to YapWrap.
+    async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
+        # Adapt this call to your application's text-response API.
+        reply = await self.existing_agent.reply(text)
+        yield AgentEvent.text(reply)
 ```
 
-All five base classes are exported from `yapify` and from their component
-packages, such as `from yapify.stt import BaseSTT`. Implement streaming methods
-with `async def` and `yield`; consume them with `async for`. The base signatures
-use `def` to describe the returned async iterator, which is not itself awaited.
-No registration, shared constructor, or change to the session is needed.
-Python raises `TypeError` if a subclass is instantiated without implementing
-its required methods.
+Pass `MyAgent(existing_agent)` as the `agent` argument to `YapWrap`.
+Stream `AgentEvent.text(delta)` as text arrives when your agent supports it.
 
-`BaseVAD.reset()` and `BaseTransport.send_event()` have no-op defaults. Override
-them to clear detector state or show conversation events. Audio components
-inherit `sample_rate = 16000`; set it on your implementation when using another
-rate, and configure every component and `YapWrap` to use that same rate.
-Release SDK resources with `async with` or `finally` so interruption closes them.
+The same approach applies to the rest of the pipeline:
 
-The runnable [custom components example](examples/custom_components.py) includes
-an agent and STT/TTS subclasses wrapping async functions:
+| Base class | Implement |
+| --- | --- |
+| `BaseAgent` | `respond(text)` → async stream of agent events |
+| `BaseSTT` | `transcribe(audio)` → async stream of transcripts |
+| `BaseTTS` | `synthesize(text)` → async stream of PCM audio |
+| `BaseVAD` | `process(pcm)` → `"start"`, `"stop"`, or `None` |
+| `BaseTransport` | `audio_in()`, `send_audio(pcm)`, and `stop_playback()` |
 
-```powershell
+All five classes are exported from `yapify`. Start with the
+[interface contracts](src/yapify/core/base.py) or run the
+[custom components walkthrough](examples/custom_components.py) without keys or hardware:
+
+```sh
 uv run python -m examples.custom_components
 ```
 
-It uses demo transcription and silence to demonstrate the interfaces without
-credentials or audio hardware. Replace its demo functions with your SDK calls
-to use real speech.
+Choose dependencies per integration: `local`, `web`, `websockets`, `webrtc`,
+`silero`, `webrtc-vad`, `deepgram`, `cartesia`, `openai`, and `elevenlabs`
+are available as extras; `audio` adds NumPy acceleration. The `all` extra
+covers the listed runtime extras except `webrtc-vad`. Framework SDKs and
+additional provider SDKs are installed separately.
 
-Migration: the old `Agent`, `STT`, `TTS`, `VAD`, and `Transport` imports still
-exist as aliases for these base classes, including in `yapify.core.protocols`.
-They now use inheritance rather than structural `Protocol` checks. Existing
-custom components should add the corresponding base class to their declaration;
-this also gives transports and VADs the default hooks used by the session.
+## Working with real conversations
 
-## Wrap Agno
-
-Install Agno and the SDK for your chosen model separately, then pass your
-existing agent:
-
-```python
-from yapify.agents import AgnoAgent
-
-voice_agent = AgnoAgent(my_agent, session_id="conversation-123")
-yapper = YapWrap(agent=voice_agent, stt=stt, tts=tts, vad=vad)
-await yapper.run(transport)
-```
-
-See `examples/frameworks/agno_agent.py` for a local Agno/Gemini example. The core never
-calls Agno directly; `AgnoAgent` translates streamed run events at the boundary.
-Async agents support cancellation; a synchronous callable running in a worker
-thread cannot be forcibly stopped.
-
-## Lifecycle and transcript contract
-
-A speech start cancels the previous reply/transcription and clears playback.
-Each utterance owns its input queue, including preroll exactly once. Input EOF,
-`VoiceSession.stop()`, or external cancellation cleans up pending tasks. STT,
-agent, and TTS failures propagate to the application instead of silently ending
-one half of the call.
-
-Custom STT adapters yield `TranscriptEvent(text, is_final=True)` for committed
-segments and `is_final=False` for interim replacements. Plain strings remain
-supported as cumulative utterance snapshots. Adapters must finish after input
-EOF and flush their final transcript; Deepgram uses `CloseStream` for this.
-
-`yapper.memory` records generated turns and interruptions. It is an audit log,
-not automatic context injection into every agent framework. Configure the
-agent's own history/session storage, or explicitly use `memory.get_messages()`
-in your callable. Sending audio does not prove it was heard: this transport
-protocol has no playback acknowledgements, and the session does not populate
-`user_heard` with guesses.
-
-## Coverage and limitations
-
-Regression coverage exercises the core pipeline and framework adapters,
-Silero framing, Deepgram/Cartesia protocol messages with fake sockets, and
-WebSocket/local playback behavior, and a local aiortc audio/transcript exchange.
-Real provider calls and microphone/speaker
-quality require a live smoke test with credentials and hardware.
-
-The WebRTC example includes browser signaling and conversation text. Its host
-ICE configuration is intended for localhost; deployments configure their own
-STUN/TURN and authentication. Framework examples use current SDK interfaces,
-but have not all been exercised with live providers. There is no universal
-latency guarantee; model, provider, and network choices affect response time.
+- **Audio:** components exchange raw PCM16 mono at a matching sample rate,
+  defaulting to 16 kHz. Custom transports convert their audio at the boundary.
+- **Transcripts:** local and browser clients display user and agent text.
+  Custom transports can implement `send_event()` to receive `transcript`,
+  `agent_delta`, and `agent_complete` events. The transcript records generated
+  text; it does not confirm which audio the listener heard.
+- **Interruptions:** a speech start cancels the current reply and clears queued
+  playback. Synchronous work running in a Python thread cannot be forcibly
+  stopped. Cancellation does not undo tool actions already performed.
+- **Deployment:** the browser examples target localhost. Your application owns
+  authentication, HTTPS, and any STUN/TURN configuration needed for WebRTC.
+- **Validation:** automated checks cover the core, adapter behavior, provider
+  protocol messages with mock connections, browser playback, and a local WebRTC
+  exchange. Live provider compatibility and microphone/speaker quality still
+  need testing with your configuration. Response time depends on the agent,
+  speech providers, and network.
 
 ## Development
 
-```powershell
-uv sync --group examples --extra web --extra silero --extra deepgram --extra cartesia
+After installing the example dependencies:
+
+```sh
 uv run pytest -q -p no:cacheprovider
 node tests/browser_client.test.cjs
+uv build
 ```
 
-Optional integration tests skip when their dependencies are absent. The core
-also has an import test with site-packages disabled to catch framework coupling.
+Optional integration tests skip when their dependencies are absent. The build
+produces a wheel and source archive that include the license.
 
 ## License
 
-Yapify is licensed under the [Apache License, Version 2.0](LICENSE).
+[Apache License, Version 2.0](LICENSE).

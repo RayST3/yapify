@@ -5,7 +5,9 @@ Run commands from the repository root. Framework examples live in
 The old numbered files have been replaced by these modules.
 
 Each example contains its own agent configuration, speech providers, VAD, and
-`YapWrap` construction. No example imports setup code from another example.
+an explicit `yapper = YapWrap(...)` object. Server examples construct it inside
+the connection handler so every call has its own agent and voice state.
+No example imports setup code from another example.
 After installing its dependencies, you can run a file directly as well as with
 `python -m`, for example `python examples/frameworks/agno_agent.py`.
 

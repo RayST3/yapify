@@ -11,7 +11,8 @@ phrase at a time; streaming SDKs can yield results/chunks as they arrive.
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 
-from yapify import AgentEvent, BaseAgent, BaseSTT, BaseTTS, TranscriptEvent
+from yapify import AgentEvent, BaseAgent, BaseSTT, BaseTTS, TranscriptEvent, YapWrap
+from yapify.vad import EnergyVAD
 
 
 class EchoAgent(BaseAgent):
@@ -57,19 +58,23 @@ async def main() -> None:
     async def microphone() -> AsyncIterator[bytes]:
         yield b"\x00\x00" * 320
 
-    stt = BufferedSTT(recognize)
-    agent = EchoAgent()
-    tts = BufferedTTS(speak)
+    yapper = YapWrap(
+        agent=EchoAgent(),
+        stt=BufferedSTT(recognize),
+        tts=BufferedTTS(speak),
+        vad=EnergyVAD(),
+    )
 
-    async for transcript in stt.transcribe(microphone()):
+    # Exercise the configured components with demo audio, without opening devices.
+    async for transcript in yapper.stt.transcribe(microphone()):
         print(f"You: {transcript.text}")
-        reply = "".join([event.content async for event in agent.respond(transcript.text)])
+        reply = "".join([event.content async for event in yapper.agent.respond(transcript.text)])
         print(f"Agent: {reply}")
-        audio = b"".join([chunk async for chunk in tts.synthesize(reply)])
+        audio = b"".join([chunk async for chunk in yapper.tts.synthesize(reply)])
         print(f"Demo PCM output: {len(audio)} bytes")
 
-    # To use these same instances in a voice session:
-    # YapWrap(agent=agent, stt=stt, tts=tts, vad=EnergyVAD())
+    # With real recognize/speak functions and the local extra installed:
+    # await yapper.startlocal()
 
 
 if __name__ == "__main__":
