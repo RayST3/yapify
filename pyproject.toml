@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yapify"
-version = "0.1.0"
+version = "0.0.1a1"
 description = "Framework-agnostic streaming voice pipeline for AI agents"
 readme = "README.md"
 license = "Apache-2.0"

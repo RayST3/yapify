@@ -3,6 +3,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from yapify import __version__
+
 
 def test_core_imports_without_site_packages():
     root = Path(__file__).resolve().parents[1]
@@ -20,4 +22,4 @@ def test_core_imports_without_site_packages():
         capture_output=True, text=True, timeout=10,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == __version__
