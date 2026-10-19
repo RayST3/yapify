@@ -5,10 +5,11 @@ import inspect
 from collections.abc import AsyncIterable, Iterable
 from typing import Any, AsyncIterator, Callable
 
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class CallableAgent:
+class CallableAgent(BaseAgent):
     """Accept text, events, and synchronous or asynchronous streams of either.
 
     Async callables are preferred for cancellable network work. Synchronous

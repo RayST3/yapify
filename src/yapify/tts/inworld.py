@@ -5,10 +5,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.inworld")
 
 
-class InworldTTS:
+class InworldTTS(BaseTTS):
     """Stream speech from Inworld AI Character Voice."""
 
     def __init__(

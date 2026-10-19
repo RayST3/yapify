@@ -6,10 +6,12 @@ import logging
 import os
 from typing import AsyncIterator, List, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.soniox")
 
 
-class SonioxSTT:
+class SonioxSTT(BaseSTT):
     """Stream audio to Soniox Real-Time WebSocket API."""
 
     def __init__(

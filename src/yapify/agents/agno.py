@@ -4,10 +4,11 @@ import asyncio
 import inspect
 from typing import Any, AsyncIterator
 
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class AgnoAgent:
+class AgnoAgent(BaseAgent):
     """Adapts an Agno Agent into a yapify Agent."""
 
     def __init__(self, agent: Any, **run_kwargs: Any) -> None:

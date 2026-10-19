@@ -7,10 +7,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.elevenlabs")
 
 
-class ElevenLabsTTS:
+class ElevenLabsTTS(BaseTTS):
     """Stream speech from ElevenLabs Turbo / Multilingual v2 over WebSocket."""
 
     def __init__(

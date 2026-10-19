@@ -2,8 +2,10 @@
 
 from typing import Optional
 
+from yapify.core.base import BaseVAD
 
-class TENVAD:
+
+class TENVAD(BaseVAD):
     """Agora TEN Framework lightweight Voice Activity Detector."""
 
     def __init__(

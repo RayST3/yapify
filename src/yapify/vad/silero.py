@@ -3,10 +3,11 @@
 from collections import deque
 from typing import Any, Optional
 
+from yapify.core.base import BaseVAD
 from yapify.core.audio import AudioReslicer
 
 
-class SileroVAD:
+class SileroVAD(BaseVAD):
     """Silero VAD using ONNX runtime for ultra-fast, local neural turn detection.
 
     Expects 16 kHz 16-bit mono PCM frames.

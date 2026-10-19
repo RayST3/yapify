@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 
 from yapify.core.audio import DEFAULT_SAMPLE_RATE
 from yapify.core.memory import InMemoryHistory
-from yapify.core.protocols import Agent, STT, TTS, VAD, Transport
+from yapify.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 from yapify.core.session import VoiceSession
 
 
@@ -18,10 +18,10 @@ class YapWrap:
 
     def __init__(
         self,
-        agent: Agent,
-        tts: TTS,
-        stt: STT,
-        vad: VAD,
+        agent: BaseAgent,
+        tts: BaseTTS,
+        stt: BaseSTT,
+        vad: BaseVAD,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         memory: Optional[InMemoryHistory] = None,
     ) -> None:
@@ -33,8 +33,8 @@ class YapWrap:
         self.memory = memory if memory is not None else InMemoryHistory()
         self._running = False
 
-    async def run(self, transport: Transport) -> None:
-        """Run with any object implementing the Transport protocol."""
+    async def run(self, transport: BaseTransport) -> None:
+        """Run with a BaseTransport implementation."""
         if self._running:
             raise RuntimeError("Create a separate YapWrap for each concurrent connection")
         self._running = True

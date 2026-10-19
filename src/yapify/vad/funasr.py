@@ -2,8 +2,10 @@
 
 from typing import Any, Optional
 
+from yapify.core.base import BaseVAD
 
-class FunASRVAD:
+
+class FunASRVAD(BaseVAD):
     """Alibaba FunASR FSMN-VAD streaming Voice Activity Detector."""
 
     def __init__(

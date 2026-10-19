@@ -2,10 +2,11 @@
 
 from contextlib import aclosing
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class ClaudeAgentSDKAgent:
+class ClaudeAgentSDKAgent(BaseAgent):
     """Adapt a connected ClaudeSDKClient owned by an async context manager."""
 
     def __init__(self, agent: Any) -> None:

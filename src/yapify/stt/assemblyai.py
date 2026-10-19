@@ -7,10 +7,12 @@ import os
 from typing import AsyncIterator, Optional
 from urllib.parse import urlencode
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.assemblyai")
 
 
-class AssemblyAISTT:
+class AssemblyAISTT(BaseSTT):
     """Stream audio to AssemblyAI Streaming STT v2."""
 
     def __init__(

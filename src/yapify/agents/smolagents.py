@@ -2,10 +2,11 @@
 
 import asyncio
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class SmolAgentsAgent:
+class SmolAgentsAgent(BaseAgent):
     """Speak final answers without reading intermediate reasoning/tool logs.
 
     Synchronous agent work runs in a worker thread. A running thread cannot be

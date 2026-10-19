@@ -5,11 +5,12 @@ import json
 from dataclasses import asdict
 from typing import Any, AsyncIterator
 
+from yapify.core.base import BaseTransport
 from yapify.core.audio import DEFAULT_SAMPLE_RATE
 from yapify.core.events import SessionEvent
 
 
-class WebSocketTransport:
+class WebSocketTransport(BaseTransport):
     """Support FastAPI/Starlette and the websockets asyncio library.
 
     Binary messages are signed little-endian PCM16 mono at sample_rate.

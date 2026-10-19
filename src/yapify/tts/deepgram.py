@@ -6,10 +6,12 @@ import os
 from typing import AsyncIterator, Optional
 from urllib.parse import urlencode
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.deepgram")
 
 
-class DeepgramAuraTTS:
+class DeepgramAuraTTS(BaseTTS):
     """Stream speech from Deepgram Aura TTS."""
 
     def __init__(

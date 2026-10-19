@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from tests.conftest import MockAgent, MockSTT, MockTTS, MockTransport, MockVAD
-from yapify import TranscriptEvent, VoiceSession
+from yapify import BaseSTT, BaseTTS, TranscriptEvent, VoiceSession
 
 
 class LiveTransport(MockTransport):
@@ -59,7 +59,7 @@ async def start(events, **components):
 async def test_complete_frames_and_transcript_segments():
     frames = []
 
-    class STT:
+    class STT(BaseSTT):
         async def transcribe(self, audio):
             async for frame in audio:
                 frames.append(frame)
@@ -94,7 +94,7 @@ async def test_complete_frames_and_transcript_segments():
 async def test_disconnect_cancels_pending_transcription():
     entered, closed = asyncio.Event(), asyncio.Event()
 
-    class STT:
+    class STT(BaseSTT):
         async def transcribe(self, audio):
             entered.set()
             try:
@@ -118,7 +118,7 @@ async def test_disconnect_cancels_pending_transcription():
 async def test_new_utterance_cancels_stale_transcription():
     first_finished, first_cancelled = asyncio.Event(), asyncio.Event()
 
-    class STT:
+    class STT(BaseSTT):
         calls = 0
 
         async def transcribe(self, audio):
@@ -151,7 +151,7 @@ async def test_new_utterance_cancels_stale_transcription():
 async def test_barge_in_closes_tts_and_records_interruption():
     closed = asyncio.Event()
 
-    class TTS:
+    class TTS(BaseTTS):
         async def synthesize(self, text):
             try:
                 yield b"\x01\x00" * 320

@@ -1,5 +1,6 @@
 """Speech-to-Text (STT) streaming transcription providers for yapify."""
 
+from yapify.core.base import BaseSTT
 from yapify.stt.deepgram import DeepgramSTT
 from yapify.stt.assemblyai import AssemblyAISTT
 from yapify.stt.openai_realtime import OpenAIRealtimeSTT
@@ -12,6 +13,7 @@ from yapify.stt.azure import AzureSpeechSTT
 from yapify.stt.aws_transcribe import AWSTranscribeSTT
 
 __all__ = [
+    "BaseSTT",
     "DeepgramSTT",
     "AssemblyAISTT",
     "OpenAIRealtimeSTT",

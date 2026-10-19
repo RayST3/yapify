@@ -2,10 +2,11 @@
 
 from contextlib import aclosing
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class GoogleADKAgent:
+class GoogleADKAgent(BaseAgent):
     """Adapt a Runner and an existing ADK session, owned by the application."""
 
     def __init__(self, runner: Any, *, user_id: str, session_id: str, run_config: Any = None) -> None:

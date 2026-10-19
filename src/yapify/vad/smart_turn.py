@@ -2,10 +2,11 @@
 
 from typing import Optional
 
+from yapify.core.base import BaseVAD
 from yapify.core.audio import calculate_rms
 
 
-class SmartTurnVAD:
+class SmartTurnVAD(BaseVAD):
     """Smart Turn detection combining acoustic voice activity with turn-completion heuristics.
 
     Designed to avoid cutting users off during brief mid-sentence pauses ("umm", "well...").

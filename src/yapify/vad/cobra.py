@@ -3,8 +3,10 @@
 import os
 from typing import Any, Optional
 
+from yapify.core.base import BaseVAD
 
-class CobraVAD:
+
+class CobraVAD(BaseVAD):
     """Picovoice Cobra highly accurate voice activity detector."""
 
     def __init__(

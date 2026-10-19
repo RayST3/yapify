@@ -6,11 +6,12 @@ from dataclasses import asdict
 from fractions import Fraction
 from typing import Any, AsyncIterator
 
+from yapify.core.base import BaseTransport
 from yapify.core.audio import DEFAULT_SAMPLE_RATE
 from yapify.core.events import SessionEvent
 
 
-class WebRTCTransport:
+class WebRTCTransport(BaseTransport):
     """Adapt aiortc audio to PCM16 mono; the application owns peer signaling."""
 
     def __init__(

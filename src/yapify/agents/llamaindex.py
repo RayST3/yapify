@@ -1,10 +1,11 @@
 """LlamaIndex FunctionAgent / AgentWorkflow adapter."""
 
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class LlamaIndexAgent:
+class LlamaIndexAgent(BaseAgent):
     """Adapt a workflow; pass ctx=Context(agent) to retain conversation state."""
 
     def __init__(self, agent: Any, **run_kwargs: Any) -> None:

@@ -1,5 +1,6 @@
 """Python Agent SDK adapters for yapify."""
 
+from yapify.core.base import BaseAgent
 from yapify.agents.agno import AgnoAgent
 from yapify.agents.langgraph import LangGraphAgent
 from yapify.agents.openai_agents import OpenAIAgentsSDKAgent
@@ -13,6 +14,7 @@ from yapify.agents.smolagents import SmolAgentsAgent
 from yapify.agents.callable import CallableAgent
 
 __all__ = [
+    "BaseAgent",
     "AgnoAgent",
     "LangGraphAgent",
     "OpenAIAgentsSDKAgent",

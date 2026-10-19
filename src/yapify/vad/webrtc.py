@@ -2,8 +2,10 @@
 
 from typing import Any, Optional
 
+from yapify.core.base import BaseVAD
 
-class WebRTCVAD:
+
+class WebRTCVAD(BaseVAD):
     """Fast, C-based WebRTC Voice Activity Detector.
 
     Requires frames of 10, 20, or 30 ms at 16 kHz (e.g. 640 bytes for 20ms).

@@ -6,10 +6,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.sarvam")
 
 
-class SarvamTTS:
+class SarvamTTS(BaseTTS):
     """Stream speech from Sarvam AI Bulbul TTS (optimized for Indian languages)."""
 
     def __init__(

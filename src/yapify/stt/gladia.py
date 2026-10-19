@@ -6,10 +6,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.gladia")
 
 
-class GladiaSTT:
+class GladiaSTT(BaseSTT):
     """Stream audio to Gladia Live Speech-to-Text v2 WebSocket API."""
 
     def __init__(

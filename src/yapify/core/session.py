@@ -9,7 +9,7 @@ from yapify.core.audio import AudioReslicer, DEFAULT_SAMPLE_RATE
 from yapify.core.events import SessionEvent, TranscriptEvent
 from yapify.core.memory import InMemoryHistory
 from yapify.core.phrases import stream_phrases
-from yapify.core.protocols import Agent, STT, Transport, TTS, VAD
+from yapify.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 
 
 class VoiceSession:
@@ -22,11 +22,11 @@ class VoiceSession:
 
     def __init__(
         self,
-        transport: Transport,
-        vad: VAD,
-        stt: STT,
-        agent: Agent,
-        tts: TTS,
+        transport: BaseTransport,
+        vad: BaseVAD,
+        stt: BaseSTT,
+        agent: BaseAgent,
+        tts: BaseTTS,
         memory: Optional[InMemoryHistory] = None,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         frame_bytes: Optional[int] = None,
@@ -101,9 +101,7 @@ class VoiceSession:
             self._is_speaking = False
             self._reslicer.clear()
             self._preroll.clear()
-            reset = getattr(self.vad, "reset", None)
-            if reset is not None:
-                reset()
+            self.vad.reset()
 
     async def _receive_audio(self) -> None:
         stream = self.transport.audio_in()
@@ -118,9 +116,7 @@ class VoiceSession:
                 await close()
 
     async def _emit(self, event_type: str, **data) -> None:
-        sink = getattr(self.transport, "send_event", None)
-        if sink is not None:
-            await sink(SessionEvent(event_type, data))
+        await self.transport.send_event(SessionEvent(event_type, data))
 
     async def _process_frame(self, frame: bytes) -> None:
         event = self.vad.process(frame)

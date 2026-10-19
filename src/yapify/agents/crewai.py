@@ -2,10 +2,11 @@
 
 import asyncio
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class CrewAIAgent:
+class CrewAIAgent(BaseAgent):
     """Speak a Crew's final output. Tasks receive the utterance as {input}."""
 
     def __init__(self, crew_or_agent: Any) -> None:

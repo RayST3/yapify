@@ -4,6 +4,11 @@ Run commands from the repository root. Framework examples live in
 `examples/frameworks`; transport examples live in `examples/transports`.
 The old numbered files have been replaced by these modules.
 
+To write a new integration, start with
+[custom_components.py](custom_components.py). It shows subclasses of
+`BaseAgent`, `BaseSTT`, and `BaseTTS`, and runs without credentials or hardware:
+`uv run python -m examples.custom_components`.
+
 ## Transport examples
 
 All four entry points use a fresh **Agno agent with Gemini Flash Lite** for each

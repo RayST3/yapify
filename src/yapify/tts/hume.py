@@ -7,10 +7,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.hume")
 
 
-class HumeTTS:
+class HumeTTS(BaseTTS):
     """Stream speech from Hume AI Empathic Voice Interface (EVI)."""
 
     def __init__(

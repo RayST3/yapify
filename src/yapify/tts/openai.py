@@ -5,10 +5,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.openai")
 
 
-class OpenAITTS:
+class OpenAITTS(BaseTTS):
     """Stream speech from OpenAI TTS-1."""
 
     def __init__(

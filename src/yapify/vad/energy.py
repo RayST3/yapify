@@ -2,10 +2,11 @@
 
 from typing import Optional
 
+from yapify.core.base import BaseVAD
 from yapify.core.audio import calculate_rms
 
 
-class EnergyVAD:
+class EnergyVAD(BaseVAD):
     """Zero-dependency Energy/RMS based Voice Activity Detector.
 
     Useful as a lightweight fallback when neural VAD packages are not installed.

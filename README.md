@@ -7,9 +7,10 @@ Python 3.10 or later is required.
 PCM input -> VAD -> streaming STT -> agent events -> phrase chunking -> TTS -> PCM output
 ```
 
-The core imports no Agno, FastAPI, device, or model SDK. An agent only needs
-`respond(text)`, an async iterator of `AgentEvent` objects. `CallableAgent` adapts
-ordinary Python functions and streams; `AgnoAgent` adapts an existing Agno agent.
+The core imports no Agno, FastAPI, device, or model SDK. Every component inherits
+an explicit abstract base class: `BaseAgent`, `BaseSTT`, `BaseTTS`, `BaseVAD`, or
+`BaseTransport`. `CallableAgent` adapts ordinary Python functions and streams;
+`AgnoAgent` adapts an existing Agno agent.
 
 ## Run the browser example
 
@@ -120,10 +121,12 @@ Agent: Which city are you in?
 User lines print once recognition finishes; agent text streams as it is
 generated. Use `await yapper.startlocal(show_transcripts=False)` for audio only.
 
-A custom transport implements:
+A custom transport subclasses `BaseTransport` and implements three methods:
 
 ```python
-class MyTransport:
+from yapify import BaseTransport
+
+class MyTransport(BaseTransport):
     async def audio_in(self):
         # Yield raw PCM16 mono bytes until the connection ends.
         yield ...
@@ -145,9 +148,9 @@ concurrent connections, pass `session_factory=create_yapper`, where the factory
 constructs independent components. A single wrapper cannot serve concurrent
 calls. Applications own authentication, socket acceptance, and connection setup.
 
-Transports can optionally implement `async send_event(event: SessionEvent)`
-(`SessionEventSink`) to receive conversation text. Existing audio-only
-transports need no changes. WebSocket clients receive JSON alongside PCM:
+Transports can override `async send_event(event: SessionEvent)` to receive
+conversation text. `BaseTransport` supplies a no-op implementation for
+audio-only transports. WebSocket clients receive JSON alongside PCM:
 
 ```json
 {"type": "transcript", "data": {"turn_id": 1, "text": "Hello", "is_final": true}, "timestamp": 0.0}
@@ -160,6 +163,66 @@ appended. `agent_complete` contains the whole generated reply and a status of
 `completed`, `interrupted`, or `error`. Speech boundary events also include the
 turn ID. These are recognized/generated words, not a record of audio actually
 heard by the listener.
+
+## Add your own component
+
+Start with [the base classes](src/yapify/core/base.py). Each class defines the
+methods a component must implement and the data those methods receive and yield.
+The session connects these components; provider-specific SDK calls stay inside
+the subclasses.
+
+| Base class | Required methods | Input → output |
+| --- | --- | --- |
+| `BaseAgent` | `respond(text)` | User text → `AgentEvent` stream |
+| `BaseSTT` | `transcribe(audio)` | PCM audio stream → transcript stream |
+| `BaseTTS` | `synthesize(text)` | Reply phrase → PCM audio stream |
+| `BaseVAD` | `process(pcm)` | PCM frame → `"start"`, `"stop"`, or `None` |
+| `BaseTransport` | `audio_in()`, `send_audio(pcm)`, `stop_playback()` | Connect incoming audio and outgoing playback |
+
+For example, this is a complete custom agent:
+
+```python
+from collections.abc import AsyncIterator
+from yapify import BaseAgent, AgentEvent
+
+class MyAgent(BaseAgent):
+    async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
+        yield AgentEvent.text("You said: ")
+        yield AgentEvent.text(text)
+
+# Pass MyAgent() as the agent argument to YapWrap.
+```
+
+All five base classes are exported from `yapify` and from their component
+packages, such as `from yapify.stt import BaseSTT`. Implement streaming methods
+with `async def` and `yield`; consume them with `async for`. The base signatures
+use `def` to describe the returned async iterator, which is not itself awaited.
+No registration, shared constructor, or change to the session is needed.
+Python raises `TypeError` if a subclass is instantiated without implementing
+its required methods.
+
+`BaseVAD.reset()` and `BaseTransport.send_event()` have no-op defaults. Override
+them to clear detector state or show conversation events. Audio components
+inherit `sample_rate = 16000`; set it on your implementation when using another
+rate, and configure every component and `YapWrap` to use that same rate.
+Release SDK resources with `async with` or `finally` so interruption closes them.
+
+The runnable [custom components example](examples/custom_components.py) includes
+an agent and STT/TTS subclasses wrapping async functions:
+
+```powershell
+uv run python -m examples.custom_components
+```
+
+It uses demo transcription and silence to demonstrate the interfaces without
+credentials or audio hardware. Replace its demo functions with your SDK calls
+to use real speech.
+
+Migration: the old `Agent`, `STT`, `TTS`, `VAD`, and `Transport` imports still
+exist as aliases for these base classes, including in `yapify.core.protocols`.
+They now use inheritance rather than structural `Protocol` checks. Existing
+custom components should add the corresponding base class to their declaration;
+this also gives transports and VADs the default hooks used by the session.
 
 ## Wrap Agno
 

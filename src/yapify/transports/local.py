@@ -5,13 +5,14 @@ import logging
 import threading
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTransport
 from yapify.core.audio import DEFAULT_SAMPLE_RATE
 from yapify.core.events import SessionEvent
 
 logger = logging.getLogger("yapify.transport.local")
 
 
-class LocalTransport:
+class LocalTransport(BaseTransport):
     """Use one sounddevice input stream and one output stream per session."""
 
     def __init__(self, sample_rate: int = DEFAULT_SAMPLE_RATE, frame_bytes: Optional[int] = None, *, show_transcripts: bool = True) -> None:

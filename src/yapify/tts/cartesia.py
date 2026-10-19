@@ -8,10 +8,12 @@ import os
 from typing import AsyncIterator, Optional
 import uuid
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.cartesia")
 
 
-class CartesiaTTS:
+class CartesiaTTS(BaseTTS):
     """Stream speech from Cartesia Sonic over WebSocket."""
 
     def __init__(

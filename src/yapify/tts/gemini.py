@@ -4,10 +4,12 @@ import asyncio
 import logging
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.gemini")
 
 
-class GoogleGeminiTTS:
+class GoogleGeminiTTS(BaseTTS):
     """Stream speech from Google Cloud Text-to-Speech / Gemini."""
 
     def __init__(

@@ -1,10 +1,11 @@
 """Pydantic AI text agent adapter."""
 
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class PydanticAIAgent:
+class PydanticAIAgent(BaseAgent):
     """Adapt a text-output Agent; pass dependencies/history as run options."""
 
     def __init__(self, agent: Any, **run_kwargs: Any) -> None:

@@ -6,10 +6,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.elevenlabs")
 
 
-class ElevenLabsSTT:
+class ElevenLabsSTT(BaseSTT):
     """Stream audio to ElevenLabs Scribe Realtime Speech-to-Text WebSocket."""
 
     def __init__(

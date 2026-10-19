@@ -2,8 +2,10 @@
 
 from typing import Any, Optional
 
+from yapify.core.base import BaseVAD
 
-class NeMoVAD:
+
+class NeMoVAD(BaseVAD):
     """NVIDIA NeMo Frame-level VAD (MarbleNet) for real-time speech detection."""
 
     def __init__(

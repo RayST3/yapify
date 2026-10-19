@@ -1,5 +1,6 @@
 """Yapify: Framework-agnostic, ultra-low-latency streaming voice pipeline for AI agents."""
 
+from yapify.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 from yapify.core.yapwrap import YapWrap
 from yapify.core.protocols import Transport, VAD, STT, Agent, TTS, SessionEventSink
 from yapify.core.events import AgentEvent, SessionEvent, TranscriptEvent
@@ -10,6 +11,11 @@ from yapify.core.memory import InMemoryHistory, ConversationTurn
 Yapper = YapWrap
 
 __all__ = [
+    "BaseAgent",
+    "BaseSTT",
+    "BaseTTS",
+    "BaseVAD",
+    "BaseTransport",
     "YapWrap",
     "Yapper",
     "Transport",

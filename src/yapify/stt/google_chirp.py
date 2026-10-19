@@ -4,10 +4,12 @@ import asyncio
 import logging
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.google_chirp")
 
 
-class GoogleChirpSTT:
+class GoogleChirpSTT(BaseSTT):
     """Stream audio to Google Cloud Speech-to-Text v2 / Chirp 3."""
 
     def __init__(

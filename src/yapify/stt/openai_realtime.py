@@ -7,10 +7,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.openai")
 
 
-class OpenAIRealtimeSTT:
+class OpenAIRealtimeSTT(BaseSTT):
     """Stream audio to OpenAI Realtime API for ultra-low latency transcription."""
 
     def __init__(

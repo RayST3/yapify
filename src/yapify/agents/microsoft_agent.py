@@ -1,10 +1,11 @@
 """Microsoft Agent Framework adapter."""
 
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class MicrosoftAgentFrameworkAgent:
+class MicrosoftAgentFrameworkAgent(BaseAgent):
     """Adapt an Agent's ResponseStream, closing it when speech is interrupted."""
 
     def __init__(self, agent: Any, **run_kwargs: Any) -> None:

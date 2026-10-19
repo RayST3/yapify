@@ -2,6 +2,7 @@
 
 from contextlib import aclosing
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
@@ -17,7 +18,7 @@ def _text(content: Any) -> str:
     return ""
 
 
-class LangGraphAgent:
+class LangGraphAgent(BaseAgent):
     """Adapt a compiled graph, optionally passing config (e.g. thread_id)."""
 
     def __init__(self, graph: Any, **run_kwargs: Any) -> None:

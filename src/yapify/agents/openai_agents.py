@@ -2,10 +2,11 @@
 
 from contextlib import aclosing
 from typing import Any, AsyncIterator
+from yapify.core.base import BaseAgent
 from yapify.core.events import AgentEvent
 
 
-class OpenAIAgentsSDKAgent:
+class OpenAIAgentsSDKAgent(BaseAgent):
     """Adapt an SDK Agent, with optional Runner and run options (e.g. session)."""
 
     def __init__(self, agent: Any, runner: Any = None, **run_kwargs: Any) -> None:

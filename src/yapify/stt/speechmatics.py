@@ -6,10 +6,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.speechmatics")
 
 
-class SpeechmaticsSTT:
+class SpeechmaticsSTT(BaseSTT):
     """Stream audio to Speechmatics Real-Time WebSocket API."""
 
     def __init__(

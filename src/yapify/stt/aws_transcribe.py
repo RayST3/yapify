@@ -4,10 +4,12 @@ import asyncio
 import logging
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.aws")
 
 
-class AWSTranscribeSTT:
+class AWSTranscribeSTT(BaseSTT):
     """Stream audio to AWS Transcribe Streaming."""
 
     def __init__(

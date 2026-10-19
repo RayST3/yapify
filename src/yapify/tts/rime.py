@@ -7,10 +7,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseTTS
+
 logger = logging.getLogger("yapify.tts.rime")
 
 
-class RimeTTS:
+class RimeTTS(BaseTTS):
     """Stream speech from Rime Labs ultra-low-latency neural TTS."""
 
     def __init__(

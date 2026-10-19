@@ -5,10 +5,12 @@ import logging
 import os
 from typing import AsyncIterator, Optional
 
+from yapify.core.base import BaseSTT
+
 logger = logging.getLogger("yapify.stt.azure")
 
 
-class AzureSpeechSTT:
+class AzureSpeechSTT(BaseSTT):
     """Stream audio to Azure Cognitive Services Speech SDK."""
 
     def __init__(

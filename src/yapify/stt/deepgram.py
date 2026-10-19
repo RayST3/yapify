@@ -7,12 +7,13 @@ import os
 from typing import AsyncIterator, List, Optional
 from urllib.parse import urlencode
 
+from yapify.core.base import BaseSTT
 from yapify.core.events import TranscriptEvent
 
 logger = logging.getLogger("yapify.stt.deepgram")
 
 
-class DeepgramSTT:
+class DeepgramSTT(BaseSTT):
     """Stream audio to Deepgram Nova-3 / Flux over WebSocket."""
 
     def __init__(

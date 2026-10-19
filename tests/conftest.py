@@ -4,10 +4,11 @@ import asyncio
 from typing import AsyncIterator, List
 import pytest
 
+from yapify import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 from yapify.core.events import AgentEvent
 
 
-class MockTransport:
+class MockTransport(BaseTransport):
     """Mock transport yielding pre-defined audio and capturing output."""
 
     def __init__(self, incoming_frames: List[bytes] = None) -> None:
@@ -27,7 +28,7 @@ class MockTransport:
         self.stopped_playback_count += 1
 
 
-class MockVAD:
+class MockVAD(BaseVAD):
     """Mock VAD yielding pre-programmed sequence of events."""
 
     def __init__(self, events: List[str | None] = None) -> None:
@@ -42,7 +43,7 @@ class MockVAD:
         return None
 
 
-class MockSTT:
+class MockSTT(BaseSTT):
     """Mock STT returning predetermined transcripts."""
 
     def __init__(self, transcript: str = "hello world") -> None:
@@ -55,7 +56,7 @@ class MockSTT:
         yield self.transcript
 
 
-class MockAgent:
+class MockAgent(BaseAgent):
     """Mock Agent returning tokens."""
 
     def __init__(self, reply: str = "Hello, I am Yapify.") -> None:
@@ -68,7 +69,7 @@ class MockAgent:
             yield AgentEvent.text(word + " ")
 
 
-class MockTTS:
+class MockTTS(BaseTTS):
     """Mock TTS generating synthetic PCM audio bytes."""
 
     def __init__(self, sample_rate: int = 16000) -> None:
