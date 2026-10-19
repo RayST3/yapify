@@ -3,25 +3,41 @@ Run: uv run --with "smolagents[openai]" python -m examples.frameworks.smolagents
 Install and key setup: examples/README.md. Speaks final answers, not reasoning.
 """
 
-from examples._shared import INSTRUCTIONS, gemini_key, gemini_model, make_yapper, run
+import asyncio
+import os
+
+from yapify import YapWrap
 from yapify.agents import SmolAgentsAgent
-
-
-def create_agent() -> SmolAgentsAgent:
-    from smolagents import OpenAIServerModel, ToolCallingAgent
-
-    model = OpenAIServerModel(
-        model_id=gemini_model(), api_key=gemini_key(),
-        api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
-    )
-    return SmolAgentsAgent(ToolCallingAgent(
-        tools=[], model=model, instructions=INSTRUCTIONS, verbosity_level=0,
-    ))
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def main():
-    await make_yapper(create_agent()).startlocal()
+    from smolagents import OpenAIServerModel, ToolCallingAgent
+
+    model = OpenAIServerModel(
+        model_id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+        api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+        api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+    )
+    agent = ToolCallingAgent(
+        tools=[],
+        model=model,
+        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+        verbosity_level=0,
+    )
+    yapper = YapWrap(
+        agent=SmolAgentsAgent(agent),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

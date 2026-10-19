@@ -3,27 +3,41 @@ Run: uv run --with langchain --with langchain-google-genai python -m examples.fr
 Install and key setup: examples/README.md.
 """
 
-from examples._shared import INSTRUCTIONS, gemini_key, gemini_model, make_yapper, run
+import asyncio
+import os
+
+from yapify import YapWrap
 from yapify.agents import LangGraphAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
-def create_agent() -> LangGraphAgent:
+async def main():
     from langchain.agents import create_agent
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langgraph.checkpoint.memory import InMemorySaver
 
     graph = create_agent(
-        model=ChatGoogleGenerativeAI(model=gemini_model(), api_key=gemini_key()),
+        model=ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+        ),
         tools=[],
-        system_prompt=INSTRUCTIONS,
+        system_prompt="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
         checkpointer=InMemorySaver(),
     )
-    return LangGraphAgent(graph, config={"configurable": {"thread_id": "local-voice"}})
-
-
-async def main():
-    await make_yapper(create_agent()).startlocal()
+    yapper = YapWrap(
+        agent=LangGraphAgent(graph, config={"configurable": {"thread_id": "local-voice"}}),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

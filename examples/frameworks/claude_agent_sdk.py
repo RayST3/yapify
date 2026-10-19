@@ -3,10 +3,14 @@ Run: uv run --with claude-agent-sdk python -m examples.frameworks.claude_agent_s
 Install and voice key setup: examples/README.md.
 """
 
+import asyncio
 import os
 
-from examples._shared import INSTRUCTIONS, make_yapper, run
+from yapify import YapWrap
 from yapify.agents import ClaudeAgentSDKAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def main():
@@ -14,13 +18,22 @@ async def main():
 
     options = ClaudeAgentOptions(
         model=os.getenv("CLAUDE_MODEL", "sonnet"),
-        system_prompt=INSTRUCTIONS,
+        system_prompt="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
         tools=[],
         include_partial_messages=True,
     )
     async with ClaudeSDKClient(options=options) as client:
-        await make_yapper(ClaudeAgentSDKAgent(client)).startlocal()
+        yapper = YapWrap(
+            agent=ClaudeAgentSDKAgent(client),
+            stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+            tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+            vad=SileroVAD(),
+        )
+        await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

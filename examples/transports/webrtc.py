@@ -5,18 +5,43 @@ Open http://localhost:8000. Install and key setup: examples/README.md.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
-from examples._shared import missing_keys
-from examples.transports._shared import create_yapper
+from yapify import YapWrap
+from yapify.agents import AgnoAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 from yapify.transports import WebRTCTransport
 
 app = FastAPI(title="Yapify WebRTC Voice")
 logger = logging.getLogger("yapify.example.webrtc")
+
+
+def create_yapper() -> YapWrap:
+    """Create a separate agent and voice components for each connection."""
+    from agno.agent import Agent
+    from agno.models.google import Gemini
+
+    agent = Agent(
+        model=Gemini(
+            id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+        ),
+        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+        markdown=False,
+    )
+    return YapWrap(
+        agent=AgnoAgent(agent),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -28,7 +53,9 @@ async def index():
 @app.websocket("/ws/offer")
 async def offer(websocket: WebSocket):
     await websocket.accept()
-    missing = missing_keys(gemini=True)
+    missing = [name for name in ("DEEPGRAM_API_KEY", "CARTESIA_API_KEY") if not os.getenv(name)]
+    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
+        missing.append("GOOGLE_API_KEY (or GEMINI_API_KEY)")
     if missing:
         await websocket.send_json({"type": "error", "message": "Set environment variables: " + ", ".join(missing)})
         await websocket.close(code=1011)

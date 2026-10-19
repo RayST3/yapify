@@ -286,3 +286,7 @@ node tests/browser_client.test.cjs
 
 Optional integration tests skip when their dependencies are absent. The core
 also has an import test with site-packages disabled to catch framework coupling.
+
+## License
+
+Yapify is licensed under the [Apache License, Version 2.0](LICENSE).

@@ -3,25 +3,40 @@ Run: uv run --with llama-index-core --with llama-index-llms-google-genai python 
 Install and voice key setup: examples/README.md.
 """
 
-from examples._shared import INSTRUCTIONS, gemini_key, gemini_model, make_yapper, run
+import asyncio
+import os
+
+from yapify import YapWrap
 from yapify.agents import LlamaIndexAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
-def create_agent() -> LlamaIndexAgent:
+async def main():
     from llama_index.core.agent.workflow import FunctionAgent
     from llama_index.core.workflow import Context
     from llama_index.llms.google_genai import GoogleGenAI
 
     agent = FunctionAgent(
-        llm=GoogleGenAI(model=gemini_model(), api_key=gemini_key()),
-        tools=[], system_prompt=INSTRUCTIONS,
+        llm=GoogleGenAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+        ),
+        tools=[],
+        system_prompt="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
     )
-    return LlamaIndexAgent(agent, ctx=Context(agent))
-
-
-async def main():
-    await make_yapper(create_agent()).startlocal()
+    yapper = YapWrap(
+        agent=LlamaIndexAgent(agent, ctx=Context(agent)),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

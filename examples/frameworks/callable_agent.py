@@ -3,8 +3,14 @@ Run: uv run python -m examples.frameworks.callable_agent
 Set DEEPGRAM_API_KEY and CARTESIA_API_KEY. Setup: examples/README.md.
 """
 
-from examples._shared import make_yapper, run
+import asyncio
+import os
+
+from yapify import YapWrap
 from yapify.agents import CallableAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def echo(text: str):
@@ -12,8 +18,17 @@ async def echo(text: str):
 
 
 async def main():
-    await make_yapper(CallableAgent(echo)).startlocal()
+    yapper = YapWrap(
+        agent=CallableAgent(echo),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

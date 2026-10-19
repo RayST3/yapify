@@ -3,10 +3,14 @@ Use the isolated install in examples/README.md to keep ADK dependencies separate
 Module: examples.frameworks.google_adk_agent
 """
 
+import asyncio
 import os
 
-from examples._shared import INSTRUCTIONS, gemini_key, gemini_model, make_yapper, run
+from yapify import YapWrap
 from yapify.agents import GoogleADKAgent
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def main():
@@ -15,23 +19,33 @@ async def main():
     from google.adk.runners import Runner
     from google.adk.sessions import InMemorySessionService
 
-    os.environ["GOOGLE_API_KEY"] = gemini_key()
+    os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"]
     sessions = InMemorySessionService()
     session = await sessions.create_session(app_name="yapify", user_id="local")
-    runner = Runner(
-        agent=Agent(name="voice_assistant", model=gemini_model(), instruction=INSTRUCTIONS),
-        app_name="yapify",
-        session_service=sessions,
+    agent = Agent(
+        name="voice_assistant",
+        model=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+        instruction="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
     )
+    runner = Runner(agent=agent, app_name="yapify", session_service=sessions)
     try:
-        agent = GoogleADKAgent(
+        voice_agent = GoogleADKAgent(
             runner, user_id="local", session_id=session.id,
             run_config=RunConfig(streaming_mode=StreamingMode.SSE),
         )
-        await make_yapper(agent).startlocal()
+        yapper = YapWrap(
+            agent=voice_agent,
+            stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+            tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+            vad=SileroVAD(),
+        )
+        await yapper.startlocal()
     finally:
         await runner.close()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +7,8 @@ name = "yapify"
 version = "0.1.0"
 description = "Framework-agnostic streaming voice pipeline for AI agents"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Yapify Contributors" }]
 keywords = ["voice", "agent", "llm", "stt", "tts", "vad", "realtime", "streaming"]

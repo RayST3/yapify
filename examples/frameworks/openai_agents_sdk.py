@@ -3,22 +3,35 @@ Run: uv run --with openai-agents python -m examples.frameworks.openai_agents_sdk
 Install and voice key setup: examples/README.md.
 """
 
+import asyncio
 import os
 
-from examples._shared import INSTRUCTIONS, make_yapper, run
+from yapify import YapWrap
 from yapify.agents import OpenAIAgentsSDKAgent
-
-
-def create_agent() -> OpenAIAgentsSDKAgent:
-    from agents import Agent, SQLiteSession
-
-    agent = Agent(name="Voice assistant", instructions=INSTRUCTIONS, model=os.environ["OPENAI_MODEL"])
-    return OpenAIAgentsSDKAgent(agent, session=SQLiteSession("local-voice"))
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def main():
-    await make_yapper(create_agent()).startlocal()
+    from agents import Agent, SQLiteSession
+
+    agent = Agent(
+        name="Voice assistant",
+        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+        model=os.environ["OPENAI_MODEL"],
+    )
+    yapper = YapWrap(
+        agent=OpenAIAgentsSDKAgent(agent, session=SQLiteSession("local-voice")),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")

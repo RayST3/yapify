@@ -4,6 +4,11 @@ Run commands from the repository root. Framework examples live in
 `examples/frameworks`; transport examples live in `examples/transports`.
 The old numbered files have been replaced by these modules.
 
+Each example contains its own agent configuration, speech providers, VAD, and
+`YapWrap` construction. No example imports setup code from another example.
+After installing its dependencies, you can run a file directly as well as with
+`python -m`, for example `python examples/frameworks/agno_agent.py`.
+
 To write a new integration, start with
 [custom_components.py](custom_components.py). It shows subclasses of
 `BaseAgent`, `BaseSTT`, and `BaseTTS`, and runs without credentials or hardware:

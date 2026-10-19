@@ -9,8 +9,6 @@ from yapify.stt.speechmatics import SpeechmaticsSTT
 from yapify.stt.soniox import SonioxSTT
 from yapify.stt.gladia import GladiaSTT
 from yapify.stt.google_chirp import GoogleChirpSTT
-from yapify.stt.azure import AzureSpeechSTT
-from yapify.stt.aws_transcribe import AWSTranscribeSTT
 
 __all__ = [
     "BaseSTT",
@@ -22,7 +20,5 @@ __all__ = [
     "SonioxSTT",
     "GladiaSTT",
     "GoogleChirpSTT",
-    "AzureSpeechSTT",
-    "AWSTranscribeSTT",
 ]
 

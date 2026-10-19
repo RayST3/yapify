@@ -2,24 +2,39 @@
 Install and key setup: examples/README.md.
 """
 
-from examples._shared import INSTRUCTIONS, gemini_key, gemini_model, make_yapper, run
+import asyncio
+import os
+
+from yapify import YapWrap
 from yapify.agents import AgnoAgent
-
-
-def create_agent() -> AgnoAgent:
-    from agno.agent import Agent
-    from agno.models.google import Gemini
-
-    return AgnoAgent(Agent(
-        model=Gemini(id=gemini_model(), api_key=gemini_key()),
-        instructions=INSTRUCTIONS,
-        markdown=False,
-    ))
+from yapify.stt import DeepgramSTT
+from yapify.tts import CartesiaTTS
+from yapify.vad import SileroVAD
 
 
 async def main():
-    await make_yapper(create_agent()).startlocal()
+    from agno.agent import Agent
+    from agno.models.google import Gemini
+
+    agent = Agent(
+        model=Gemini(
+            id=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+            api_key=os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"],
+        ),
+        instructions="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
+        markdown=False,
+    )
+    yapper = YapWrap(
+        agent=AgnoAgent(agent),
+        stt=DeepgramSTT(api_key=os.environ["DEEPGRAM_API_KEY"]),
+        tts=CartesiaTTS(api_key=os.environ["CARTESIA_API_KEY"]),
+        vad=SileroVAD(),
+    )
+    await yapper.startlocal()
 
 
 if __name__ == "__main__":
-    run(main)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nSession ended.")
