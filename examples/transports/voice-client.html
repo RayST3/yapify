@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yapify Voice Client</title>
+  <style>
+    body { font: 18px system-ui, sans-serif; max-width: 620px; margin: 60px auto; padding: 0 20px; }
+    button { font: inherit; padding: 12px 24px; margin-right: 8px; cursor: pointer; }
+    #status { min-height: 3em; }
+    #conversation { max-height: 55vh; overflow-y: auto; padding: 4px; }
+    .message { padding: 14px 16px; margin: 12px 0; border-radius: 12px; background: #f1f3f5; }
+    .message.you { margin-left: 32px; background: #eaf2ff; }
+    .message.agent { margin-right: 32px; }
+    .message p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message small { margin-left: 12px; color: #596577; font-size: 0.75em; }
+    #emptyConversation { color: #596577; }
+  </style>
+</head>
+<body>
+  <h1>Yapify Voice Client</h1>
+  <p>Start a call and speak into your microphone. Use headphones to reduce echo.</p>
+  <button id="start">Start call</button><button id="stop" disabled>End call</button>
+  <p id="status" role="status" aria-live="polite">Disconnected</p>
+  <h2>Conversation</h2>
+  <p id="emptyConversation">Your words and the agent's replies will appear here.</p>
+  <div id="conversation" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions text"></div>
+  <script>
+    const startButton = document.querySelector('#start');
+    const stopButton = document.querySelector('#stop');
+    const status = document.querySelector('#status');
+    const conversation = document.querySelector('#conversation');
+    const emptyConversation = document.querySelector('#emptyConversation');
+    const RATE = 16000;
+    let call = null;
+
+    // Worklet capture is independent of UI rendering and emits 20 ms PCM16 frames.
+    const captureSource = `
+      class Capture extends AudioWorkletProcessor {
+        constructor() { super(); this.pcm = new ArrayBuffer(640); this.view = new DataView(this.pcm); this.offset = 0; }
+        process(inputs) {
+          const samples = inputs[0]?.[0];
+          if (samples) for (const sample of samples) {
+            this.view.setInt16(this.offset, Math.max(-32768, Math.min(32767, Math.round(sample * 32768))), true);
+            this.offset += 2;
+            if (this.offset === 640) {
+              this.port.postMessage(this.pcm, [this.pcm]);
+              this.pcm = new ArrayBuffer(640); this.view = new DataView(this.pcm); this.offset = 0;
+            }
+          }
+          return true;
+        }
+      }
+      registerProcessor('pcm-capture', Capture);
+    `;
+
+    function conversationMessage(state, role, turnId) {
+      const key = `${role}:${turnId}`;
+      if (!state.messages.has(key)) {
+        const row = document.createElement('article');
+        row.className = `message ${role}`;
+        const speaker = document.createElement('strong');
+        speaker.textContent = role === 'you' ? 'You' : 'Agent';
+        const progress = document.createElement('small');
+        const body = document.createElement('p');
+        row.append(speaker, progress, body);
+        conversation.append(row);
+        emptyConversation.hidden = true;
+        state.messages.set(key, { role, body, progress, pending: true });
+      }
+      return state.messages.get(key);
+    }
+
+    function updateConversation(state, message) {
+      const data = message.data || {};
+      if (data.turn_id == null) return;
+      const follow = conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 80;
+      if (message.type === 'speech_started') {
+        for (const entry of state.messages.values()) {
+          if (entry.role === 'you' && entry.pending) {
+            entry.progress.textContent = 'Transcription interrupted';
+            entry.pending = false;
+          }
+        }
+      } else if (message.type === 'transcript') {
+        if (!data.text && !state.messages.has(`you:${data.turn_id}`)) return;
+        const entry = conversationMessage(state, 'you', data.turn_id);
+        entry.body.textContent = data.text || '';
+        entry.pending = !data.is_final;
+        entry.progress.textContent = data.is_final ? '' : 'Recognizing…';
+      } else if (message.type === 'agent_delta') {
+        if (!data.text) return;
+        const entry = conversationMessage(state, 'agent', data.turn_id);
+        entry.body.textContent += data.text;
+        entry.progress.textContent = 'Responding…';
+      } else if (message.type === 'agent_complete') {
+        if (!data.text && !state.messages.has(`agent:${data.turn_id}`)) return;
+        const entry = conversationMessage(state, 'agent', data.turn_id);
+        entry.body.textContent = data.text || '';
+        entry.pending = false;
+        entry.progress.textContent = { interrupted: 'Interrupted', error: 'Reply failed' }[data.status] || '';
+      }
+      if (follow) conversation.scrollTop = conversation.scrollHeight;
+    }
+
+    function finishConversation(state) {
+      for (const entry of state.messages.values()) {
+        if (entry.pending) {
+          entry.progress.textContent = 'Call ended';
+          entry.pending = false;
+        }
+      }
+    }
+
+    function stopPlayback(state) {
+      for (const node of state.playing) { node.onended = null; node.stop(); node.disconnect(); }
+      state.playing.clear();
+      state.nextTime = 0;
+      state.tail = new Uint8Array(0);
+    }
+
+    function playPcm(state, buffer) {
+      const incoming = new Uint8Array(buffer);
+      const combined = new Uint8Array(state.tail.length + incoming.length);
+      combined.set(state.tail); combined.set(incoming, state.tail.length);
+      const length = combined.length - combined.length % 2;
+      state.tail = combined.slice(length);
+      if (!length) return;
+      const view = new DataView(combined.buffer, 0, length);
+      const audio = state.context.createBuffer(1, length / 2, RATE);
+      const samples = audio.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) samples[i] = view.getInt16(i * 2, true) / 32768;
+      const node = state.context.createBufferSource();
+      node.buffer = audio;
+      node.connect(state.context.destination);
+      state.playing.add(node);
+      node.onended = () => { state.playing.delete(node); node.disconnect(); };
+      const when = Math.max(state.context.currentTime + 0.01, state.nextTime);
+      node.start(when);
+      state.nextTime = when + audio.duration;
+    }
+
+    async function endCall(state, message = 'Call ended.') {
+      if (state.closed) return;
+      state.closed = true;
+      finishConversation(state);
+      state.socket?.close();
+      state.pc?.close();
+      if (state.remoteAudio) {
+        state.remoteAudio.pause();
+        state.remoteAudio.srcObject = null;
+        state.remoteAudio.remove();
+      }
+      state.capture?.disconnect();
+      state.source?.disconnect();
+      state.stream?.getTracks().forEach(track => track.stop());
+      stopPlayback(state);
+      if (state.context && state.context.state !== 'closed') await state.context.close();
+      if (call === state) {
+        call = null;
+        status.textContent = message;
+        startButton.disabled = false;
+        stopButton.disabled = true;
+      }
+    }
+
+    async function startRtcCall(state) {
+      state.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (state.closed) { state.stream.getTracks().forEach(track => track.stop()); return; }
+      state.pc = new RTCPeerConnection({ iceServers: [] });
+      state.remoteAudio = document.createElement('audio');
+      state.remoteAudio.autoplay = true;
+      state.remoteAudio.controls = true;
+      document.body.append(state.remoteAudio);
+      state.pc.ontrack = event => {
+        state.remoteAudio.srcObject = new MediaStream([event.track]);
+        state.remoteAudio.play().catch(() => {
+          if (!state.closed) status.textContent = 'Connected. Press play on the audio control to hear replies.';
+        });
+      };
+      state.pc.onconnectionstatechange = () => {
+        if (state.closed) return;
+        if (state.pc.connectionState === 'connected') status.textContent = 'Connected. Start speaking.';
+        if (['failed', 'closed', 'disconnected'].includes(state.pc.connectionState)) void endCall(state);
+      };
+      const channel = state.pc.createDataChannel('events');
+      channel.onmessage = event => {
+        if (!state.closed) updateConversation(state, JSON.parse(event.data));
+      };
+      for (const track of state.stream.getTracks()) state.pc.addTrack(track, state.stream);
+      await state.pc.setLocalDescription(await state.pc.createOffer());
+      // This example sends a complete SDP offer instead of trickling candidates.
+      if (state.pc.iceGatheringState !== 'complete') {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => { cleanup(); reject(new Error('WebRTC connection timed out.')); }, 10000);
+          const check = () => {
+            if (state.pc.iceGatheringState === 'complete') { cleanup(); resolve(); }
+          };
+          const cleanup = () => { clearTimeout(timeout); state.pc.removeEventListener('icegatheringstatechange', check); };
+          state.pc.addEventListener('icegatheringstatechange', check);
+          check();
+        });
+      }
+      if (state.closed) return;
+      const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+      state.socket = new WebSocket(`${scheme}://${location.host}/ws/offer`);
+      state.socket.onopen = () => state.socket.send(JSON.stringify(state.pc.localDescription));
+      state.socket.onmessage = async event => {
+        if (state.closed) return;
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'error') await endCall(state, message.message);
+          else if (message.type === 'answer') await state.pc.setRemoteDescription(message);
+        } catch (error) { await endCall(state, error.message); }
+      };
+      state.socket.onerror = () => void endCall(state, 'Connection failed. Check the server.');
+      state.socket.onclose = () => void endCall(state);
+    }
+
+    async function startCall() {
+      const state = { playing: new Set(), messages: new Map(), nextTime: 0, tail: new Uint8Array(0), closed: false };
+      call = state;
+      conversation.replaceChildren();
+      emptyConversation.hidden = false;
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      status.textContent = 'Opening microphone…';
+      try {
+        if (document.body.dataset.transport === 'webrtc') {
+          await startRtcCall(state);
+          return;
+        }
+        state.context = new AudioContext({ sampleRate: RATE });
+        await state.context.resume();
+        if (state.context.sampleRate !== RATE) throw new Error('This browser cannot capture audio at 16 kHz.');
+        state.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+        if (state.closed) { state.stream.getTracks().forEach(track => track.stop()); return; }
+        const url = URL.createObjectURL(new Blob([captureSource], { type: 'text/javascript' }));
+        try { await state.context.audioWorklet.addModule(url); }
+        finally { URL.revokeObjectURL(url); }
+        if (state.closed) return;
+        state.source = state.context.createMediaStreamSource(state.stream);
+        state.capture = new AudioWorkletNode(state.context, 'pcm-capture');
+        state.source.connect(state.capture);
+        state.capture.connect(state.context.destination);
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const endpoint = new URLSearchParams(location.search).get('ws') || `${scheme}://${location.host}/ws/voice`;
+        state.socket = new WebSocket(endpoint);
+        state.socket.binaryType = 'arraybuffer';
+        state.capture.port.onmessage = event => {
+          if (state.socket.readyState === WebSocket.OPEN) state.socket.send(event.data);
+        };
+        state.socket.onopen = () => {
+          status.textContent = 'Connected. Start speaking.';
+          stopButton.disabled = false;
+        };
+        state.socket.onmessage = event => {
+          if (state.closed) return;
+          if (event.data instanceof ArrayBuffer) playPcm(state, event.data);
+          else {
+            const message = JSON.parse(event.data);
+            updateConversation(state, message);
+            if (message.type === 'stop_playback') stopPlayback(state);
+            if (message.type === 'error') void endCall(state, message.message);
+          }
+        };
+        state.socket.onclose = () => void endCall(state);
+        state.socket.onerror = () => void endCall(state, 'Connection failed. Check the server.');
+      } catch (error) { await endCall(state, error.message); }
+    }
+    startButton.onclick = startCall;
+    stopButton.onclick = () => { if (call) void endCall(call); };
+    window.addEventListener('pagehide', () => { if (call) void endCall(call); });
+  </script>
+</body>
+</html>
