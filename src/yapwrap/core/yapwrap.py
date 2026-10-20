@@ -1,4 +1,4 @@
-"""Convenience entry points over the framework-independent VoiceSession."""
+"""Convenience entry points over the framework-independent YapSesh."""
 
 import asyncio
 from typing import Any, Callable, Optional
@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 from yapwrap.core.audio import DEFAULT_SAMPLE_RATE
 from yapwrap.core.memory import InMemoryHistory
 from yapwrap.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
-from yapwrap.core.session import VoiceSession
+from yapwrap.core.session import YapSesh
 
 
 class YapWrap:
@@ -39,7 +39,7 @@ class YapWrap:
             raise RuntimeError("Create a separate YapWrap for each concurrent connection")
         self._running = True
         try:
-            session = VoiceSession(
+            session = YapSesh(
                 transport=transport,
                 vad=self.vad,
                 stt=self.stt,

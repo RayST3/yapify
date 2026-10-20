@@ -1,11 +1,11 @@
-"""Test VoiceSession orchestration and barge-in interruption."""
+"""Test YapSesh orchestration and barge-in interruption."""
 
 import asyncio
 import pytest
 
 from tests.conftest import MockTransport, MockVAD, MockSTT, MockAgent, MockTTS
 from yapwrap.core.memory import InMemoryHistory
-from yapwrap.core.session import VoiceSession
+from yapwrap.core.session import YapSesh
 
 
 @pytest.mark.asyncio
@@ -23,7 +23,7 @@ async def test_voice_session_turn():
     tts = MockTTS()
     memory = InMemoryHistory()
 
-    session = VoiceSession(
+    session = YapSesh(
         transport=transport,
         vad=vad,
         stt=stt,
@@ -64,7 +64,7 @@ async def test_voice_session_barge_in():
     tts = MockTTS()
     memory = InMemoryHistory()
 
-    session = VoiceSession(
+    session = YapSesh(
         transport=transport,
         vad=vad,
         stt=stt,

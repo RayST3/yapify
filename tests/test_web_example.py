@@ -53,6 +53,7 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
     wrappers = []
     wrapper_class = example.YapWrap
     sockets = []
+    connection_urls = []
 
     class IdleSpeechSocket:
         closed = False
@@ -60,9 +61,10 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
         async def close(self):
             self.closed = True
 
-    async def connect(*args, **kwargs):
-        # TTS now connects at call startup, including calls containing only
-        # silence. Exercise that lifecycle without contacting a live provider.
+    async def connect(url, **kwargs):
+        # STT and TTS connect at call startup, including calls containing only
+        # silence. Exercise both lifecycles without contacting live providers.
+        connection_urls.append(url)
         socket = IdleSpeechSocket()
         sockets.append(socket)
         return socket
@@ -85,7 +87,9 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
     assert wrappers[0].vad is not wrappers[1].vad
     assert wrappers[0].memory is not wrappers[1].memory
     assert wrappers[0].agent.agent is not wrappers[1].agent.agent
-    assert len(sockets) == 2
+    assert len(sockets) == 4
+    assert sum(url.startswith("wss://api.deepgram.com/") for url in connection_urls) == 2
+    assert sum(url.startswith("wss://api.cartesia.ai/") for url in connection_urls) == 2
     assert all(socket.closed for socket in sockets)
 
 

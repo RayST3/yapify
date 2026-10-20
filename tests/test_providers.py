@@ -45,10 +45,13 @@ class Socket:
         self.ready.set()
 
     async def recv(self):
-        from websockets.exceptions import ConnectionClosedError
+        from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+        from websockets.frames import Close
         try:
             return await anext(self._receiver)
         except StopAsyncIteration:
+            if self.sent and isinstance(self.sent[-1], str) and json.loads(self.sent[-1]).get("type") == "CloseStream":
+                raise ConnectionClosedOK(Close(1000, ""), Close(1000, ""), True) from None
             raise ConnectionClosedError(None, None) from None
 
     async def __aiter__(self):

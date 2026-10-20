@@ -31,9 +31,18 @@ class BaseAgent(ABC):
 
 
 class BaseSTT(ABC):
-    """Turn one utterance's incoming audio into recognized text."""
+    """Turn one utterance's incoming audio into recognized text.
+
+    Stateful adapters can extend ManagedSTT or WebSocketSTT in core.stt.
+    Custom subclasses still need only implement transcribe().
+    """
 
     sample_rate: int = DEFAULT_SAMPLE_RATE
+
+    @asynccontextmanager
+    async def session(self) -> AsyncGenerator["BaseSTT", None]:
+        """Own provider resources for a voice call; stateless adapters need no setup."""
+        yield self
 
     @abstractmethod
     def transcribe(self, audio: AsyncIterator[bytes]) -> AsyncIterator[str | TranscriptEvent]:
@@ -75,7 +84,7 @@ class BaseTTS(ABC):
 
         Providers with streaming text input should override this method. The
         default keeps existing synthesize(str) providers working with bounded
-        phrases. VoiceSession opens session() once around the entire call.
+        phrases. YapSesh opens session() once around the entire call.
         """
         from yapwrap.core.phrases import stream_phrases
 

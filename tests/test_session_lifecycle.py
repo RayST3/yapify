@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from tests.conftest import MockAgent, MockSTT, MockTTS, MockTransport, MockVAD
-from yapwrap import AgentEvent, BaseSTT, BaseTTS, TranscriptEvent, VoiceSession
+from yapwrap import AgentEvent, BaseSTT, BaseTTS, TranscriptEvent, YapSesh
 
 
 class LiveTransport(MockTransport):
@@ -44,7 +44,7 @@ class LiveTransport(MockTransport):
 
 async def start(events, **components):
     transport = LiveTransport()
-    session = VoiceSession(
+    session = YapSesh(
         transport=transport, vad=MockVAD(events),
         stt=components.get("stt", MockSTT()),
         agent=components.get("agent", MockAgent()),
@@ -227,7 +227,7 @@ async def test_external_cancellation_is_preserved():
 
 def test_session_rejects_mismatched_pcm_rates():
     with pytest.raises(ValueError, match="tts sample_rate"):
-        VoiceSession(MockTransport(), MockVAD(), MockSTT(), MockAgent(), MockTTS(24000))
+        YapSesh(MockTransport(), MockVAD(), MockSTT(), MockAgent(), MockTTS(24000))
 
 
 @pytest.mark.asyncio
@@ -466,7 +466,7 @@ async def test_failed_tts_startup_resets_session_for_retry():
             raise RuntimeError("connection failed")
             yield self
 
-    session = VoiceSession(LiveTransport(), MockVAD(), MockSTT(), MockAgent(), TTS())
+    session = YapSesh(LiveTransport(), MockVAD(), MockSTT(), MockAgent(), TTS())
     for _ in range(2):
         with pytest.raises(RuntimeError, match="connection failed"):
             await session.run()

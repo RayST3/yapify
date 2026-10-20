@@ -2802,6 +2802,7 @@ local = [
 ]
 openai = [
     { name = "openai" },
+    { name = "websockets" },
 ]
 silero = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -2866,6 +2867,7 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'cartesia'", specifier = ">=13.0" },
     { name = "websockets", marker = "extra == 'deepgram'", specifier = ">=13.0" },
     { name = "websockets", marker = "extra == 'elevenlabs'", specifier = ">=13.0" },
+    { name = "websockets", marker = "extra == 'openai'", specifier = ">=13.0" },
     { name = "websockets", marker = "extra == 'web'", specifier = ">=13.0" },
     { name = "websockets", marker = "extra == 'websockets'", specifier = ">=13.0" },
 ]

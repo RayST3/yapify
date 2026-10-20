@@ -12,7 +12,7 @@ from yapwrap.core.memory import InMemoryHistory
 from yapwrap.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 
 
-class VoiceSession:
+class YapSesh:
     """Link a transport, VAD, STT, agent and TTS for one connection.
 
     Input EOF means disconnect: pending work is cancelled and awaited.
@@ -93,12 +93,12 @@ class VoiceSession:
     async def run(self) -> None:
         """Run until disconnect, stop(), cancellation, or a provider failure."""
         if self._is_running:
-            raise RuntimeError("This VoiceSession is already running")
+            raise RuntimeError("This YapSesh is already running")
         self._is_running = True
         self._stop_event.clear()
         self._failure = asyncio.get_running_loop().create_future()
         try:
-            async with self.tts.session():
+            async with self.stt.session(), self.tts.session():
                 await self._run_connected()
         finally:
             self._is_running = False

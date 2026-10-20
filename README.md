@@ -247,7 +247,7 @@ Built-in TTS adapters share three base classes, exported from `yapwrap`:
 | `RealtimeTTS` | Managed lifetime plus incremental text and synthesis contexts across pauses | `_open_connection()` and `_synthesize_context(text_deltas)` |
 | `WebSocketTTS` | Realtime streaming plus concurrent send/receive, timeouts, PCM alignment, and socket recovery | `_connection_settings()`, `_send_text(text_deltas, context_id)`, and `_decode_message(message, context_id)` |
 
-`VoiceSession` opens `tts.session()` once for the voice call. Standalone synthesis
+`YapSesh` opens `stt.session()` and `tts.session()` once for the voice call. Standalone synthesis
 also cleans up its resources; wrap multiple standalone replies in
 `async with tts.session():` to reuse a client. Create a separate TTS instance for
 each concurrent call. A provider with a special SDK shutdown method can override
@@ -325,6 +325,74 @@ Protocol references:
 [Azure](https://learn.microsoft.com/azure/ai-services/speech-service/how-to-lower-speech-synthesis-latency),
 [Google](https://docs.cloud.google.com/text-to-speech/docs/create-audio-text-streaming),
 [OpenAI](https://developers.openai.com/api/docs/guides/text-to-speech).
+
+### STT streaming support
+
+All eight STT adapters use the same resource ownership and input cleanup rules.
+The public session class is `YapSesh`, exported from `yapwrap` and `yapwrap.core`.
+It closes both speech providers after cancelling and awaiting active work.
+
+| Base class | Shared behavior | Adapter hooks |
+| --- | --- | --- |
+| `ManagedSTT` | Exclusive access per utterance, client lifetime, PCM alignment/resampling, input cleanup | `_open_connection()`, `_transcribe_stream(audio)` |
+| `WebSocketSTT` | Concurrent upload/receive, upload errors, finalization timeout, optional keepalive, reconnect after interruption | `_connection_settings()`, `_finish_audio()`, `_decode_message(message)`; override `_send_audio_chunk()` for JSON audio |
+
+These classes are exported from `yapwrap`. Both `ManagedSTT` and `ManagedTTS`
+inherit the resource-lifetime implementation in
+[core/connections.py](src/yapwrap/core/connections.py). Existing custom `BaseSTT`
+subclasses can still implement just `transcribe(audio)`; the default `session()`
+hook does nothing.
+
+The STT decoder returns `(transcript_events, finished)`. A final transcript
+segment does **not** mean all microphone input has ended. Adapters consume the
+whole utterance and wait for a provider completion signal after sending the
+last audio. Interim events replace provisional text; final events append a
+committed segment. Soniox combines subword tokens into utterance snapshots to
+preserve their exact spacing.
+
+| Adapter | Completion boundary | Reuse within a voice call |
+| --- | --- | --- |
+| `DeepgramSTT` | `CloseStream`, all results, then normal socket close | New socket per utterance; Nova `Finalize` alone has no guaranteed acknowledgement |
+| `AssemblyAISTT` | v3 `Terminate` → `Termination`, draining all `Turn` messages | New socket per utterance |
+| `ElevenLabsSTT` | Scribe manual audio commit → `committed_transcript` | Shared socket |
+| `SpeechmaticsSTT` | `ForceEndOfUtterance` → `EndOfUtterance` | Shared socket |
+| `SonioxSTT` | Manual `finalize` → final `<fin>` token | Shared socket with application keepalive |
+| `OpenAIRealtimeSTT` | Transcription-only session, manual commit → completed input item | Shared socket; converts incoming audio to 24 kHz |
+| `GladiaSTT` | HTTP initialization, returned WebSocket, `stop_recording` → `post_final_transcript` | New recognition session per utterance |
+| `GoogleChirpSTT` | Streaming RPC ends after input EOF and all response segments | Shared SDK client, new RPC per utterance |
+
+All interrupted or failed recognition streams are discarded before the next
+utterance. Closed idle sockets reconnect on the next request. A live utterance
+can exceed `response_timeout`; that timeout bounds the final drain after input
+ends, as well as individual WebSocket uploads. Connection/configuration waits
+use `connect_timeout`. These bounds raise errors rather than silently accepting
+an incomplete transcript.
+
+Migration notes: AssemblyAI now uses Streaming v3 and maps `word_boost` to
+`keyterms_prompt`. ElevenLabs defaults to `scribe_v2_realtime` and sends JSON
+audio chunks to `/speech-to-text/realtime`. OpenAI's `model` now selects the
+transcription model, defaulting to `gpt-live-transcribe`; it no longer creates a
+conversational model session with a separate hard-coded Whisper recognizer.
+The `openai` extra includes WebSockets for this path.
+
+Gladia's `base_url` is now the HTTP initialization endpoint
+`https://api.gladia.io/v2/live`. Google defaults to `chirp_3` in `location="us"`
+and requires `project_id` or `GOOGLE_CLOUD_PROJECT`; install `google-cloud-speech`
+separately. Its recognizer resource and API endpoint use the configured region.
+Speechmatics uses `wss://eu.rt.speechmatics.com/v2` by default. `DeepgramSTT`
+implements Nova's v1 protocol and rejects Flux models, which need a v2 adapter.
+
+Protocol references:
+[Deepgram completion](https://developers.deepgram.com/docs/close-stream) and
+[Finalize limitations](https://developers.deepgram.com/docs/finalize),
+[AssemblyAI](https://www.assemblyai.com/docs/streaming/api-spec/streaming-websocket),
+[ElevenLabs](https://elevenlabs.io/docs/api-reference/speech-to-text/v-1-speech-to-text-realtime),
+[Speechmatics](https://docs.speechmatics.com/api-ref/realtime-transcription-websocket),
+[Soniox](https://soniox.com/docs/stt/rt/manual-finalization),
+[OpenAI](https://developers.openai.com/api/docs/guides/realtime-transcription),
+[Gladia initialization](https://docs.gladia.io/api-reference/v2/live/init) and
+[stream messages](https://docs.gladia.io/api-reference/v2/live/websocket),
+[Google](https://docs.cloud.google.com/speech-to-text/docs/models/chirp-3).
 
 ## Working with real conversations
 

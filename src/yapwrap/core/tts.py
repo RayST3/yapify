@@ -6,74 +6,22 @@ framing, and cancellation for providers using a WebSocket protocol.
 """
 
 import asyncio
-import inspect
 import re
 from abc import abstractmethod
 from collections.abc import AsyncGenerator, AsyncIterator
-from contextlib import aclosing, asynccontextmanager, suppress
+from contextlib import aclosing, suppress
 from typing import Any, Optional
 from uuid import uuid4
 
 from yapwrap.core.base import BaseTTS
+from yapwrap.core.connections import ManagedConnection
 
 
-class ManagedTTS(BaseTTS):
+class ManagedTTS(ManagedConnection, BaseTTS):
     """Reuse provider resources across phrases and replies, with exclusive access."""
 
-    def __init__(self, *, sample_rate: int = 16000) -> None:
-        if sample_rate <= 0:
-            raise ValueError("sample_rate must be positive")
-        self.sample_rate = sample_rate
-        self._connection: Any = None
-        self._session_active = False
-        self._lock = asyncio.Lock()
-
-    @abstractmethod
-    async def _open_connection(self) -> Any:
-        """Return an opened client or connection. Clean up if setup fails."""
-        raise NotImplementedError
-
-    async def _ensure_open(self) -> None:
-        if self._connection is None:
-            self._connection = await self._open_connection()
-
-    async def _close_connection(self) -> None:
-        connection, self._connection = self._connection, None
-        if connection is not None:
-            close = getattr(connection, "aclose", None) or connection.close
-            result = close()
-            if inspect.isawaitable(result):
-                await result
-
-    @asynccontextmanager
-    async def session(self) -> AsyncGenerator["ManagedTTS", None]:
-        if self._session_active:
-            raise RuntimeError(f"Create a separate {type(self).__name__} for each concurrent voice call")
-        self._session_active = True
-        try:
-            async with self._lock:
-                await self._ensure_open()
-            yield self
-        finally:
-            try:
-                async with self._lock:
-                    await self._close_connection()
-            finally:
-                self._session_active = False
-
-    @asynccontextmanager
-    async def _client(self) -> AsyncGenerator[Any, None]:
-        """Serialize a request; standalone requests also close their resources."""
-        async with self._lock:
-            try:
-                await self._ensure_open()
-                yield self._connection
-            finally:
-                if not self._session_active:
-                    await self._close_connection()
-
     async def synthesize_stream(self, text: AsyncIterator[str]) -> AsyncGenerator[bytes, None]:
-        # The phrase fallback must reuse its client even outside VoiceSession.
+        # The phrase fallback must reuse its client even outside YapSesh.
         try:
             if not self._session_active:
                 async with self.session(), aclosing(super().synthesize_stream(text)) as audio:
