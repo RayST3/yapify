@@ -2754,7 +2754,7 @@ wheels = [
 ]
 
 [[package]]
-name = "yapify"
+name = "yapwrap"
 version = "0.0.1a1"
 source = { editable = "." }
 dependencies = [

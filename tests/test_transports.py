@@ -4,11 +4,11 @@ import asyncio
 import json
 import pytest
 
-from yapify import SessionEvent, SessionEventSink
+from yapwrap import SessionEvent, SessionEventSink
 
-from yapify.transports.websocket import WebSocketTransport
-from yapify.transports.webrtc import WebRTCTransport
-from yapify.transports.local import LocalTransport
+from yapwrap.transports.websocket import WebSocketTransport
+from yapwrap.transports.webrtc import WebRTCTransport
+from yapwrap.transports.local import LocalTransport
 
 
 class DummyWebSocket:

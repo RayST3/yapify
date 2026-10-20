@@ -1,2 +1,2 @@
-"""Tests package for yapify."""
+"""Tests package for yapwrap."""
 

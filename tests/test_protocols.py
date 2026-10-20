@@ -1,27 +1,27 @@
-"""Test protocol conformance for yapify components."""
+"""Test protocol conformance for yapwrap components."""
 
 import pytest
 
-from yapify.core.protocols import Transport, VAD, STT, Agent, TTS
-from yapify.transports.websocket import WebSocketTransport
-from yapify.transports.local import LocalTransport
-from yapify.transports.webrtc import WebRTCTransport
-from yapify.vad.energy import EnergyVAD
-from yapify.vad.silero import SileroVAD
-from yapify.vad.webrtc import WebRTCVAD
-from yapify.vad.smart_turn import SmartTurnVAD
-from yapify.stt.deepgram import DeepgramSTT
-from yapify.stt.openai_realtime import OpenAIRealtimeSTT
-from yapify.stt.assemblyai import AssemblyAISTT
-from yapify.tts.cartesia import CartesiaTTS
-from yapify.tts.elevenlabs import ElevenLabsTTS
-from yapify.tts.deepgram import DeepgramAuraTTS
-from yapify.tts.openai import OpenAITTS
-from yapify.agents.agno import AgnoAgent
-from yapify.agents.langgraph import LangGraphAgent
-from yapify.agents.pydantic_ai import PydanticAIAgent
-from yapify.agents.openai_agents import OpenAIAgentsSDKAgent
-from yapify.agents.callable import CallableAgent
+from yapwrap.core.protocols import Transport, VAD, STT, Agent, TTS
+from yapwrap.transports.websocket import WebSocketTransport
+from yapwrap.transports.local import LocalTransport
+from yapwrap.transports.webrtc import WebRTCTransport
+from yapwrap.vad.energy import EnergyVAD
+from yapwrap.vad.silero import SileroVAD
+from yapwrap.vad.webrtc import WebRTCVAD
+from yapwrap.vad.smart_turn import SmartTurnVAD
+from yapwrap.stt.deepgram import DeepgramSTT
+from yapwrap.stt.openai_realtime import OpenAIRealtimeSTT
+from yapwrap.stt.assemblyai import AssemblyAISTT
+from yapwrap.tts.cartesia import CartesiaTTS
+from yapwrap.tts.elevenlabs import ElevenLabsTTS
+from yapwrap.tts.deepgram import DeepgramAuraTTS
+from yapwrap.tts.openai import OpenAITTS
+from yapwrap.agents.agno import AgnoAgent
+from yapwrap.agents.langgraph import LangGraphAgent
+from yapwrap.agents.pydantic_ai import PydanticAIAgent
+from yapwrap.agents.openai_agents import OpenAIAgentsSDKAgent
+from yapwrap.agents.callable import CallableAgent
 
 
 def test_transport_protocols():

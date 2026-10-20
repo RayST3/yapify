@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from yapify.stt.deepgram import DeepgramSTT
-from yapify.tts.cartesia import CartesiaTTS
+from yapwrap.stt.deepgram import DeepgramSTT
+from yapwrap.tts.cartesia import CartesiaTTS
 
 
 class Socket:

@@ -3,14 +3,14 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "yapify"
+name = "yapwrap"
 version = "0.0.1a1"
 description = "Framework-agnostic streaming voice pipeline for AI agents"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-authors = [{ name = "Yapify Contributors" }]
+authors = [{ name = "YapWrap Contributors" }]
 keywords = ["voice", "agent", "llm", "stt", "tts", "vad", "realtime", "streaming"]
 dependencies = [
     "typing-extensions>=4.8.0",
@@ -47,7 +47,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/yapify"]
+packages = ["src/yapwrap"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,11 +1,11 @@
-"""Shared test fixtures and mocks for yapify tests."""
+"""Shared test fixtures and mocks for yapwrap tests."""
 
 import asyncio
 from typing import AsyncIterator, List
 import pytest
 
-from yapify import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
-from yapify.core.events import AgentEvent
+from yapwrap import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
+from yapwrap.core.events import AgentEvent
 
 
 class MockTransport(BaseTransport):
@@ -59,7 +59,7 @@ class MockSTT(BaseSTT):
 class MockAgent(BaseAgent):
     """Mock Agent returning tokens."""
 
-    def __init__(self, reply: str = "Hello, I am Yapify.") -> None:
+    def __init__(self, reply: str = "Hello, I am YapWrap.") -> None:
         self.reply = reply
         self.received_prompts: List[str] = []
 

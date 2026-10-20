@@ -1,13 +1,13 @@
-# Introducing Yapify
+# Introducing YapWrap
 
 **Make your agents yap.**
 
-Give the agent you've already built a voice. Yapify connects your existing
+Give the agent you've already built a voice. YapWrap connects your existing
 Python agent to speech recognition, speech synthesis, and live audio—so people
 can talk to it.
 
 You've chosen a framework, configured a model, connected tools, and worked out
-memory and workflows. Yapify starts with that agent. Wrap it in an adapter,
+memory and workflows. YapWrap starts with that agent. Wrap it in an adapter,
 choose your speech providers, and turn it into a yapper.
 
 Built-in adapters cover **Agno, Claude Agent SDK, CrewAI, Google ADK,
@@ -23,11 +23,11 @@ a stream of text chunks:
 ```python
 import asyncio
 
-from yapify import YapWrap
-from yapify.agents import CallableAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
+from yapwrap import YapWrap
+from yapwrap.agents import CallableAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
 
 from your_app import reply  # Your existing agent's text-in, text-out entry point.
 
@@ -42,7 +42,7 @@ asyncio.run(yapper.startlocal())
 ```
 
 Your function keeps calling your agent with its configured model, instructions,
-tools, and session state. It can be synchronous or asynchronous. Yapify handles
+tools, and session state. It can be synchronous or asynchronous. YapWrap handles
 listening and speaking.
 
 You can also wrap framework objects directly with a [built-in adapter](#bring-your-framework).
@@ -51,14 +51,14 @@ session configuration.
 
 **[Try it locally](#get-talking) · [Try it in your browser](#choose-where-your-agent-yaps) · [Find your framework](#bring-your-framework) · [Build an adapter](#make-it-your-own)**
 
-## Why Yapify?
+## Why YapWrap?
 
 Adding voice to an existing agent brings a new set of concerns: microphone
 input, speech recognition, turn detection, audio playback, interruptions, and
 keeping the conversation visible. Reusing an agent also means connecting its
 input, output, and session state to that voice pipeline.
 
-Yapify puts that connection at the center of its API:
+YapWrap puts that connection at the center of its API:
 
 - **Bring your agent.** Use an adapter around your configured agent, graph,
   runner, or client. Your framework continues to execute its tools and workflows.
@@ -80,7 +80,7 @@ Your voice → speech recognition → your existing agent → speech synthesis �
 
 ## Get talking
 
-Python 3.10+ is required by Yapify; individual framework SDKs can require a newer
+Python 3.10+ is required by YapWrap; individual framework SDKs can require a newer
 version. From the repository root, install the example dependencies:
 
 ```sh
@@ -127,7 +127,7 @@ python -m pip install -e ".[local,silero,deepgram,cartesia]"
 ```
 
 Install your agent's framework and model SDK separately. This command installs
-Yapify's voice dependencies; the `examples` group above also installs Agno and
+YapWrap's voice dependencies; the `examples` group above also installs Agno and
 Google's model SDK. See the [example guide](examples/README.md) for other setups.
 
 ## Choose where your agent yaps
@@ -161,7 +161,7 @@ A single `YapWrap` instance serves one conversation at a time.
 Built-in adapters connect these Python agent APIs. Each linked example shows
 the required SDK dependencies, object types, and session setup.
 
-| Your agent | Yapify adapter | Example |
+| Your agent | YapWrap adapter | Example |
 | --- | --- | --- |
 | Agno | `AgnoAgent` | [Agno](examples/frameworks/agno_agent.py) |
 | LangGraph / LangChain agents | `LangGraphAgent` | [LangGraph](examples/frameworks/langgraph_agent.py) |
@@ -176,7 +176,7 @@ the required SDK dependencies, object types, and session setup.
 | Your own Python function or stream | `CallableAgent` | [Callable](examples/frameworks/callable_agent.py) |
 
 Adapters translate recognized text into framework calls and reply text into
-Yapify events. They work with the interfaces shown in the examples; arbitrary
+YapWrap events. They work with the interfaces shown in the examples; arbitrary
 graph inputs, structured outputs, or application-specific events may need a
 custom adapter. CrewAI and smolagents currently speak the final answer.
 
@@ -186,17 +186,17 @@ Continue using your framework's session, history, and persistence mechanisms.
 Pass the relevant run options through its adapter—for example, an Agno
 `session_id`, a LangGraph `config` with a `thread_id`, or a LlamaIndex `ctx`.
 
-Yapify does not automatically migrate or populate agent memory. Its
+YapWrap does not automatically migrate or populate agent memory. Its
 `yapper.memory` records generated conversation turns and interruptions.
 Your application decides which framework session each voice conversation uses.
 
-## Where Yapify fits
+## Where YapWrap fits
 
 Pipecat and LiveKit can also connect existing agent logic.
 [Pipecat includes a LangChain processor](https://github.com/pipecat-ai/pipecat/blob/main/src/pipecat/processors/frameworks/langchain.py),
 and [LiveKit provides a LangGraph/LangChain adapter](https://docs.livekit.io/agents/models/llm/langchain/).
 
-Yapify focuses on a direct Python integration: take an existing agent, wrap its
+YapWrap focuses on a direct Python integration: take an existing agent, wrap its
 text interface, choose speech components, and run it through a transport.
 It's built for developers who want to add voice while continuing to own their
 agent's framework, tools, and session setup.
@@ -209,7 +209,7 @@ text and returns text or a stream of text. For more control, subclass `BaseAgent
 ```python
 from collections.abc import AsyncIterator
 
-from yapify import AgentEvent, BaseAgent
+from yapwrap import AgentEvent, BaseAgent
 
 class MyAgent(BaseAgent):
     def __init__(self, existing_agent):
@@ -234,8 +234,8 @@ The same approach applies to the rest of the pipeline:
 | `BaseVAD` | `process(pcm)` → `"start"`, `"stop"`, or `None` |
 | `BaseTransport` | `audio_in()`, `send_audio(pcm)`, and `stop_playback()` |
 
-All five classes are exported from `yapify`. Start with the
-[interface contracts](src/yapify/core/base.py) or run the
+All five classes are exported from `yapwrap`. Start with the
+[interface contracts](src/yapwrap/core/base.py) or run the
 [custom components walkthrough](examples/custom_components.py) without keys or hardware:
 
 ```sh

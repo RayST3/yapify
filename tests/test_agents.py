@@ -2,11 +2,11 @@
 
 import pytest
 
-from yapify.agents.callable import CallableAgent
-from yapify.agents.agno import AgnoAgent
-from yapify.agents.langgraph import LangGraphAgent
-from yapify.agents.pydantic_ai import PydanticAIAgent
-from yapify.core.events import AgentEvent
+from yapwrap.agents.callable import CallableAgent
+from yapwrap.agents.agno import AgnoAgent
+from yapwrap.agents.langgraph import LangGraphAgent
+from yapwrap.agents.pydantic_ai import PydanticAIAgent
+from yapwrap.core.events import AgentEvent
 
 
 @pytest.mark.asyncio

@@ -15,14 +15,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from starlette.websockets import WebSocketState
 
-from yapify import YapWrap
-from yapify.agents import AgnoAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
+from yapwrap import YapWrap
+from yapwrap.agents import AgnoAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
 
-app = FastAPI(title="Yapify Voice Server")
-logger = logging.getLogger("yapify.example")
+app = FastAPI(title="YapWrap Voice Server")
+logger = logging.getLogger("yapwrap.example")
 
 
 @app.websocket("/ws/voice")

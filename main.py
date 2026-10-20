@@ -1,18 +1,18 @@
 import asyncio
-from yapify import YapWrap
-from yapify.agents import CallableAgent
-from yapify.vad import EnergyVAD
+from yapwrap import YapWrap
+from yapwrap.agents import CallableAgent
+from yapwrap.vad import EnergyVAD
 
 
 async def demo_echo_agent(text: str):
     """Simple async generator agent."""
-    yield f"You said: {text}. Yapify is working!"
+    yield f"You said: {text}. YapWrap is working!"
 
 
 def main():
-    print("Yapify initialized successfully.")
+    print("YapWrap initialized successfully.")
     print("Example usage:")
-    print("  from yapify import YapWrap")
+    print("  from yapwrap import YapWrap")
     print("  yapper = YapWrap(agent=..., tts=..., stt=..., vad=...)")
     print("  await yapper.startlocal()")
 

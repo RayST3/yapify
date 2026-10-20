@@ -4,8 +4,8 @@ import asyncio
 import pytest
 
 from tests.conftest import MockTransport, MockVAD, MockSTT, MockAgent, MockTTS
-from yapify.core.memory import InMemoryHistory
-from yapify.core.session import VoiceSession
+from yapwrap.core.memory import InMemoryHistory
+from yapwrap.core.session import VoiceSession
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_voice_session_turn():
     vad = MockVAD(events=vad_events)
 
     stt = MockSTT(transcript="what is your name")
-    agent = MockAgent(reply="I am Yapify.")
+    agent = MockAgent(reply="I am YapWrap.")
     tts = MockTTS()
     memory = InMemoryHistory()
 
@@ -47,7 +47,7 @@ async def test_voice_session_turn():
     # Verify memory recorded the turn
     assert len(memory) == 1
     assert memory.turns[0].user_transcript == "what is your name"
-    assert "Yapify" in memory.turns[0].agent_response
+    assert "YapWrap" in memory.turns[0].agent_response
 
 
 @pytest.mark.asyncio

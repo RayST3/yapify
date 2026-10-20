@@ -1,4 +1,4 @@
-"""Write your own components by subclassing Yapify's base classes.
+"""Write your own components by subclassing YapWrap's base classes.
 
 Run: python -m examples.custom_components
 
@@ -11,8 +11,8 @@ phrase at a time; streaming SDKs can yield results/chunks as they arrive.
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 
-from yapify import AgentEvent, BaseAgent, BaseSTT, BaseTTS, TranscriptEvent, YapWrap
-from yapify.vad import EnergyVAD
+from yapwrap import AgentEvent, BaseAgent, BaseSTT, BaseTTS, TranscriptEvent, YapWrap
+from yapwrap.vad import EnergyVAD
 
 
 class EchoAgent(BaseAgent):

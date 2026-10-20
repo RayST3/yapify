@@ -32,15 +32,15 @@ jobs:
           from pathlib import Path
           import tomllib
 
-          import yapify
+          import yapwrap
 
           project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
           version = project["version"]
           tag = os.environ["RELEASE_TAG"]
           if tag != f"v{version}":
               raise SystemExit(f"Release tag {tag!r} must be v{version} to match pyproject.toml")
-          if yapify.__version__ != version:
-              raise SystemExit("Update yapify.__version__ to match pyproject.toml")
+          if yapwrap.__version__ != version:
+              raise SystemExit("Update yapwrap.__version__ to match pyproject.toml")
           PY
 
       - name: Run tests
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/yapify
+      url: https://pypi.org/p/yapwrap
     permissions:
       id-token: write
     steps:
@@ -72,6 +72,7 @@ jobs:
           name: python-distributions
           path: dist/
 
-      # Register RayST3/yapify, publish.yml, and environment pypi on PyPI.
+      # Register the PyPI project yapwrap with this GitHub repository,
+      # workflow publish.yml, and environment pypi as its Trusted Publisher.
       - name: Publish with Trusted Publishing
         uses: pypa/gh-action-pypi-publish@release/v1

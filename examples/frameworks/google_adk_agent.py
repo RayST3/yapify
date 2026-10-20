@@ -6,11 +6,11 @@ Module: examples.frameworks.google_adk_agent
 import asyncio
 import os
 
-from yapify import YapWrap
-from yapify.agents import GoogleADKAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
+from yapwrap import YapWrap
+from yapwrap.agents import GoogleADKAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
 
 
 async def main():
@@ -21,13 +21,13 @@ async def main():
 
     os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY") or os.environ["GEMINI_API_KEY"]
     sessions = InMemorySessionService()
-    session = await sessions.create_session(app_name="yapify", user_id="local")
+    session = await sessions.create_session(app_name="yapwrap", user_id="local")
     agent = Agent(
         name="voice_assistant",
         model=os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
         instruction="You are a friendly voice assistant. Give natural spoken answers in at most two sentences. Avoid markdown.",
     )
-    runner = Runner(agent=agent, app_name="yapify", session_service=sessions)
+    runner = Runner(agent=agent, app_name="yapwrap", session_service=sessions)
     try:
         voice_agent = GoogleADKAgent(
             runner, user_id="local", session_id=session.id,

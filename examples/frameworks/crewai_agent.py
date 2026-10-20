@@ -6,11 +6,11 @@ Module: examples.frameworks.crewai_agent
 import asyncio
 import os
 
-from yapify import YapWrap
-from yapify.agents import CrewAIAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
+from yapwrap import YapWrap
+from yapwrap.agents import CrewAIAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
 
 
 async def main():

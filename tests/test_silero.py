@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from yapify.vad.silero import SileroVAD
+from yapwrap.vad.silero import SileroVAD
 
 
 def test_silero_reframes_without_losing_or_repeating_samples():

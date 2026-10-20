@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from tests.conftest import MockAgent, MockSTT, MockTTS, MockTransport, MockVAD
-from yapify import BaseSTT, BaseTTS, TranscriptEvent, VoiceSession
+from yapwrap import BaseSTT, BaseTTS, TranscriptEvent, VoiceSession
 
 
 class LiveTransport(MockTransport):

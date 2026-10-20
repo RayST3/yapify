@@ -105,11 +105,11 @@ uv run --isolated --no-project --python 3.13 --with-editable ".[local,silero,dee
 ```
 
 For another row, substitute its packages in the `--with` arguments and its
-module name at the end. These commands install Yapify from this checkout.
+module name at the end. These commands install YapWrap from this checkout.
 For example, CrewAI uses `--with "crewai[google-genai]>=1.15"` and
 `examples.frameworks.crewai_agent`. CrewAI 1.15 requires Python below 3.14, so
 keep `--python 3.13` when running it. Some frameworks impose stricter Python or
-dependency constraints than Yapify itself. Google ADK currently pins an older
+dependency constraints than YapWrap itself. Google ADK currently pins an older
 OpenTelemetry range, so keep it isolated from the web environment.
 
 LangChain now uses `langchain.agents.create_agent`, which runs on LangGraph,
@@ -131,7 +131,7 @@ tools; it is a conversation example.
 
 History belongs to each framework. The LangGraph, OpenAI, ADK, Claude,
 LlamaIndex, and Microsoft examples show their native session/context mechanism.
-The other examples use their framework's default history behavior. Yapify's
+The other examples use their framework's default history behavior. YapWrap's
 transcript log does not automatically become model context.
 
 ## Validation

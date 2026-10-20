@@ -7,7 +7,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from yapify.agents import (
+from yapwrap.agents import (
     ClaudeAgentSDKAgent, CrewAIAgent, GoogleADKAgent, LangGraphAgent,
     LlamaIndexAgent, MicrosoftAgentFrameworkAgent, OpenAIAgentsSDKAgent,
     PydanticAIAgent, SmolAgentsAgent,

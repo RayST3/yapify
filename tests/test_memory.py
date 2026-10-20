@@ -1,6 +1,6 @@
 """Test InMemoryHistory adapter."""
 
-from yapify.core.memory import InMemoryHistory, ConversationTurn
+from yapwrap.core.memory import InMemoryHistory, ConversationTurn
 
 
 def test_in_memory_history_basic():

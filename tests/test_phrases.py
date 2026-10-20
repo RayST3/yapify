@@ -2,7 +2,7 @@
 
 import asyncio
 import pytest
-from yapify.core.phrases import find_phrase_boundary, stream_phrases
+from yapwrap.core.phrases import find_phrase_boundary, stream_phrases
 
 
 def test_find_phrase_boundary():

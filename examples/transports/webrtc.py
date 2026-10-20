@@ -12,15 +12,15 @@ from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
-from yapify import YapWrap
-from yapify.agents import AgnoAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
-from yapify.transports import WebRTCTransport
+from yapwrap import YapWrap
+from yapwrap.agents import AgnoAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
+from yapwrap.transports import WebRTCTransport
 
-app = FastAPI(title="Yapify WebRTC Voice")
-logger = logging.getLogger("yapify.example.webrtc")
+app = FastAPI(title="YapWrap WebRTC Voice")
+logger = logging.getLogger("yapwrap.example.webrtc")
 
 
 @app.get("/", response_class=HTMLResponse)

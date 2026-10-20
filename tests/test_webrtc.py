@@ -13,8 +13,8 @@ from aiortc import AudioStreamTrack, RTCConfiguration, RTCPeerConnection
 from aiortc.mediastreams import MediaStreamError
 from av import AudioFrame
 
-from yapify import SessionEvent
-from yapify.transports import WebRTCTransport
+from yapwrap import SessionEvent
+from yapwrap.transports import WebRTCTransport
 
 
 async def test_input_converts_stereo_48k_to_mono_16k():

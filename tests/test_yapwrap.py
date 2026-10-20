@@ -1,9 +1,9 @@
 """Test YapWrap unified class."""
 
 import pytest
-from yapify import YapWrap, Yapper
-from yapify.agents.callable import CallableAgent
-from yapify.vad.energy import EnergyVAD
+from yapwrap import YapWrap, Yapper
+from yapwrap.agents.callable import CallableAgent
+from yapwrap.vad.energy import EnergyVAD
 from tests.conftest import MockSTT, MockTTS
 
 

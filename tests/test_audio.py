@@ -1,7 +1,7 @@
-"""Test audio utilities in yapify."""
+"""Test audio utilities in yapwrap."""
 
 import struct
-from yapify.core.audio import (
+from yapwrap.core.audio import (
     AudioReslicer,
     calculate_rms,
     resample_pcm,

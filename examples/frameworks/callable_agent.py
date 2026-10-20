@@ -6,11 +6,11 @@ Set DEEPGRAM_API_KEY and CARTESIA_API_KEY. Setup: examples/README.md.
 import asyncio
 import os
 
-from yapify import YapWrap
-from yapify.agents import CallableAgent
-from yapify.stt import DeepgramSTT
-from yapify.tts import CartesiaTTS
-from yapify.vad import SileroVAD
+from yapwrap import YapWrap
+from yapwrap.agents import CallableAgent
+from yapwrap.stt import DeepgramSTT
+from yapwrap.tts import CartesiaTTS
+from yapwrap.vad import SileroVAD
 
 
 async def echo(text: str):

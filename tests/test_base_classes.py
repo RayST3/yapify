@@ -5,9 +5,9 @@ import inspect
 
 import pytest
 
-import yapify
-from yapify import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport, SessionEvent
-from yapify.core import protocols
+import yapwrap
+from yapwrap import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport, SessionEvent
+from yapwrap.core import protocols
 
 
 @pytest.mark.parametrize("base,required", [
@@ -31,7 +31,7 @@ def test_incomplete_extensions_cannot_be_instantiated(base, required):
     ("vad", BaseVAD), ("transports", BaseTransport),
 ])
 def test_every_exported_component_inherits_its_interface(package, base):
-    module = importlib.import_module(f"yapify.{package}")
+    module = importlib.import_module(f"yapwrap.{package}")
     assert getattr(module, base.__name__) is base
     providers = [getattr(module, name) for name in module.__all__ if name != base.__name__]
     assert providers
@@ -42,7 +42,7 @@ def test_every_exported_component_inherits_its_interface(package, base):
 
 def test_legacy_interface_names_are_aliases():
     for name, base in [("Agent", BaseAgent), ("STT", BaseSTT), ("TTS", BaseTTS), ("VAD", BaseVAD), ("Transport", BaseTransport)]:
-        assert getattr(yapify, name) is base
+        assert getattr(yapwrap, name) is base
         assert getattr(protocols, name) is base
 
 
