@@ -52,6 +52,22 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "test-no-network")
     wrappers = []
     wrapper_class = example.YapWrap
+    sockets = []
+
+    class IdleSpeechSocket:
+        closed = False
+
+        async def close(self):
+            self.closed = True
+
+    async def connect(*args, **kwargs):
+        # TTS now connects at call startup, including calls containing only
+        # silence. Exercise that lifecycle without contacting a live provider.
+        socket = IdleSpeechSocket()
+        sockets.append(socket)
+        return socket
+
+    monkeypatch.setattr("websockets.asyncio.client.connect", connect)
 
     def record_wrapper(**kwargs):
         wrapper = wrapper_class(**kwargs)
@@ -69,6 +85,8 @@ def test_browser_silence_and_reconnect_with_real_silero(monkeypatch):
     assert wrappers[0].vad is not wrappers[1].vad
     assert wrappers[0].memory is not wrappers[1].memory
     assert wrappers[0].agent.agent is not wrappers[1].agent.agent
+    assert len(sockets) == 2
+    assert all(socket.closed for socket in sockets)
 
 
 def test_browser_receives_conversation_text_and_audio(monkeypatch):

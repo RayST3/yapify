@@ -12,3 +12,6 @@ wheels/
 .ruff_cache/
 .uv-cache/
 .env
+
+# Local temporary files
+/tmp/

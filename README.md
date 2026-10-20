@@ -234,6 +234,31 @@ The same approach applies to the rest of the pipeline:
 | `BaseVAD` | `process(pcm)` → `"start"`, `"stop"`, or `None` |
 | `BaseTransport` | `audio_in()`, `send_audio(pcm)`, and `stop_playback()` |
 
+TTS providers that accept incremental text can override
+`synthesize_stream(text_deltas)` to produce audio directly from the agent's
+token stream. The default implementation groups text into phrases and calls
+`synthesize(text)`, so existing custom providers continue to work.
+
+Built-in TTS adapters share three base classes, exported from `yapwrap`:
+
+| Base class | What it handles | What an adapter implements |
+| --- | --- | --- |
+| `ManagedTTS` | One client per voice call, serialized access, cleanup, phrase fallback | `_open_connection()` and `synthesize(text)`; use `async with self._client()` for each request |
+| `RealtimeTTS` | Managed lifetime plus incremental text and synthesis contexts across pauses | `_open_connection()` and `_synthesize_context(text_deltas)` |
+| `WebSocketTTS` | Realtime streaming plus concurrent send/receive, timeouts, PCM alignment, and socket recovery | `_connection_settings()`, `_send_text(text_deltas, context_id)`, and `_decode_message(message, context_id)` |
+
+`VoiceSession` opens `tts.session()` once for the voice call. Standalone synthesis
+also cleans up its resources; wrap multiple standalone replies in
+`async with tts.session():` to reuse a client. Create a separate TTS instance for
+each concurrent call. A provider with a special SDK shutdown method can override
+`_close_connection()`.
+
+WebSocket decoders return `(pcm_bytes, finished)`. `finished` must mean that all
+audio for the submitted context has arrived, including its final flush. Adapters
+filter unrelated context IDs and raise provider errors. The default cancellation
+closes the socket; `_cancel_context()` can retain it only when the protocol can
+isolate cancelled audio from subsequent replies.
+
 All five classes are exported from `yapwrap`. Start with the
 [interface contracts](src/yapwrap/core/base.py) or run the
 [custom components walkthrough](examples/custom_components.py) without keys or hardware:
@@ -248,6 +273,59 @@ are available as extras; `audio` adds NumPy acceleration. The `all` extra
 covers the listed runtime extras except `webrtc-vad`. Framework SDKs and
 additional provider SDKs are installed separately.
 
+### TTS streaming support
+
+Sending text incrementally and receiving audio incrementally are separate
+capabilities. The adapters use the following paths:
+
+| Adapter | Text input and audio output | Resources between replies |
+| --- | --- | --- |
+| `CartesiaTTS` | Text deltas and PCM over WebSocket | Shared socket, separate context IDs |
+| `ElevenLabsTTS` | Text deltas through multi-context WebSocket; flush then close each context | Shared socket, separate context IDs |
+| `DeepgramAuraTTS` | `Speak` deltas, `Flush`, binary PCM, `Flushed` completion | Shared socket; reconnect after cancellation |
+| `InworldTTS` | Bidirectional WebSocket, text deltas, raw PCM; wait for `contextClosed` | Shared socket; reconnect after cancellation |
+| `RimeTTS` | Mist JSON WebSocket, text deltas, explicit flush, PCM | Shared socket; reconnect after cancellation |
+| `SarvamTTS` | Bulbul WebSocket, text deltas, PCM, final completion event | Shared socket; reconnect after cancellation |
+| `HumeTTS` | Octave TTS input stream; PCM snippets converted from 48 kHz | Reconnect each context after draining its normal server close |
+| `AzureSpeechTTS` | SDK text stream with audio callbacks; PCM converted from 24 kHz | Shared synthesizer and SDK connection |
+| `GoogleGeminiTTS` | Chirp3-HD: bidirectional text/audio; other voices: complete-phrase requests | Shared Cloud TTS client |
+| `OpenAITTS` | Complete phrases into the Speech API; response bytes streamed and converted from 24 kHz | Shared HTTP client |
+
+Rime, Inworld, Sarvam, and Hume need the `websockets` extra. Azure needs
+`azure-cognitiveservices-speech>=1.37`. Google needs a current
+`google-cloud-texttospeech` SDK with `StreamingAudioConfig` for streaming voices.
+Despite its historical class name, `GoogleGeminiTTS` uses **Google Cloud TTS**.
+Its default Journey voice keeps phrase synthesis; select a voice such as
+`en-US-Chirp3-HD-Charon` for streaming input.
+
+Most realtime adapters finish their current context after a 120 ms text pause;
+Cartesia defaults to 750 ms. Adjust `context_idle_timeout` to suit token arrival
+patterns. A tool pause flushes already generated text and later text starts a
+new context. Rime also flushes at punctuation or after a delta takes the context
+to 150 characters. Deepgram limits explicit flushes to 20 per 60 seconds, so it
+flushes at pauses/end rather than every sentence and surfaces flush-limit errors.
+This does not generate filler speech when the agent emits no text before a tool.
+
+The streaming migration changes some provider defaults: Rime uses
+`speaker="cove", model_id="mistv3"`; Inworld uses
+`voice_id="Ashley", model="inworld-tts-2"`; Sarvam uses
+`speaker="anushka", model="bulbul:v2"`; Hume uses the Octave voice `"Ava Song"`
+instead of an EVI chat voice. Custom `base_url` values for these adapters must
+target their streaming WebSocket endpoints. Supply compatible voices/models
+explicitly if your application depends on a particular voice.
+
+Protocol references:
+[Cartesia](https://docs.cartesia.ai/api-reference/tts/websocket),
+[ElevenLabs](https://elevenlabs.io/docs/eleven-api/guides/how-to/websockets/multi-context-web-socket),
+[Deepgram flush semantics and limits](https://developers.deepgram.com/docs/tts-ws-flush),
+[Inworld](https://docs.inworld.ai/api-reference/ttsAPI/texttospeech/synthesize-speech-websocket),
+[Rime](https://docs.rime.ai/api-reference/mistv3/websockets-json),
+[Sarvam](https://docs.sarvam.ai/api/api-guides-tutorials/text-to-speech/streaming-api/web-socket),
+[Hume](https://dev.hume.ai/voice/reference/text-to-speech-tts/stream-input),
+[Azure](https://learn.microsoft.com/azure/ai-services/speech-service/how-to-lower-speech-synthesis-latency),
+[Google](https://docs.cloud.google.com/text-to-speech/docs/create-audio-text-streaming),
+[OpenAI](https://developers.openai.com/api/docs/guides/text-to-speech).
+
 ## Working with real conversations
 
 - **Audio:** components exchange raw PCM16 mono at a matching sample rate,
@@ -257,8 +335,14 @@ additional provider SDKs are installed separately.
   `agent_delta`, and `agent_complete` events. The transcript records generated
   text; it does not confirm which audio the listener heard.
 - **Interruptions:** a speech start cancels the current reply and clears queued
-  playback. Synchronous work running in a Python thread cannot be forcibly
+  playback. Microphone capture continues while providers clean up, and output
+  from the retired turn is discarded. Each stateful component finishes cleanup
+  before reuse. Synchronous work running in a Python thread cannot be forcibly
   stopped. Cancellation does not undo tool actions already performed.
+- **Streaming speech:** adapters share connection and streaming engines, with
+  provider-specific protocols and completion signals. Buffered text is flushed
+  across tool pauses, and closed sockets reopen before a new context. See the
+  [provider capabilities and migration notes](#tts-streaming-support).
 - **Deployment:** the browser examples target localhost. Your application owns
   authentication, HTTPS, and any STUN/TURN configuration needed for WebRTC.
 - **Validation:** automated checks cover the core, adapter behavior, provider

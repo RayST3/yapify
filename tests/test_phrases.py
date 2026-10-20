@@ -49,3 +49,30 @@ async def test_trailing_whitespace_terminates(tokens):
     phrases = await asyncio.wait_for(consume(), 1)
     assert phrases == ([] if tokens == ["   "] else ["Hello."])
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix", [" ", "Checking.  ", "Checking.\n\n\n"])
+async def test_whitespace_during_tool_pause_waits_without_busy_polling(monkeypatch, prefix):
+    import yapwrap.core.phrases as module
+
+    checks = 0
+    boundary = module.find_phrase_boundary
+
+    def count_checks(*args, **kwargs):
+        nonlocal checks
+        checks += 1
+        return boundary(*args, **kwargs)
+
+    monkeypatch.setattr(module, "find_phrase_boundary", count_checks)
+
+    async def source():
+        yield prefix
+        await asyncio.sleep(0.05)
+        yield "Found it."
+
+    result = [phrase async for phrase in stream_phrases(source(), max_delay_ms=5)]
+    assert result == (["Found it."] if not prefix.strip() else ["Checking.", "Found it."])
+    # An idle stream should sleep, even after the phrase deadline passes.
+    # The regression did thousands of boundary checks during this pause.
+    assert checks < 20
+

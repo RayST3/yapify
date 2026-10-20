@@ -1,71 +1,59 @@
-"""Sarvam AI Bulbul streaming text-to-speech for Indian languages."""
+"""Sarvam Bulbul WebSocket text-to-speech with explicit completion events."""
 
-import asyncio
 import base64
-import logging
+import json
 import os
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Optional
+from urllib.parse import urlencode
 
-from yapwrap.core.base import BaseTTS
-
-logger = logging.getLogger("yapwrap.tts.sarvam")
+from yapwrap.core.tts import WebSocketTTS
 
 
-class SarvamTTS(BaseTTS):
-    """Stream speech from Sarvam AI Bulbul TTS (optimized for Indian languages)."""
+class SarvamTTS(WebSocketTTS):
+    """Stream Indian-language speech and retain the socket between replies."""
 
     def __init__(
-        self,
-        api_key: Optional[str] = None,
-        language_code: str = "hi-IN",
-        speaker: str = "meera",
-        model: str = "bulbul:v1",
-        sample_rate: int = 16000,
-        base_url: str = "https://api.sarvam.ai/text-to-speech",
+        self, api_key: Optional[str] = None, language_code: str = "hi-IN",
+        speaker: str = "anushka", model: str = "bulbul:v2", sample_rate: int = 16000,
+        base_url: str = "wss://api.sarvam.ai/text-to-speech/ws", *,
+        context_idle_timeout: float = 0.12, connect_timeout: float = 15.0,
+        response_timeout: float = 30.0,
     ) -> None:
+        super().__init__(sample_rate=sample_rate, context_idle_timeout=context_idle_timeout,
+                         connect_timeout=connect_timeout, response_timeout=response_timeout)
         self.api_key = api_key or os.getenv("SARVAM_API_KEY", "")
-        self.language_code = language_code
-        self.speaker = speaker
-        self.model = model
-        self.sample_rate = sample_rate
+        self.language_code, self.speaker, self.model = language_code, speaker, model
         self.base_url = base_url
 
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Synthesize text into raw PCM16 audio bytes."""
-        if not text.strip():
-            return
-
-        try:
-            import httpx
-        except ImportError as exc:
-            raise ImportError("SarvamTTS requires `pip install httpx`.") from exc
-
+    def _connection_settings(self) -> tuple[str, dict[str, str]]:
         if not self.api_key:
             raise ValueError("SarvamTTS requires an api_key or SARVAM_API_KEY env var.")
+        if not self.base_url.startswith(("ws://", "wss://")):
+            raise ValueError("SarvamTTS base_url must be a streaming WebSocket endpoint")
+        params = urlencode({"model": self.model, "send_completion_event": "true"})
+        separator = "&" if "?" in self.base_url else "?"
+        return self.base_url + separator + params, {"api-subscription-key": self.api_key}
 
-        headers = {
-            "api-subscription-key": self.api_key,
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "inputs": [text],
-            "target_language_code": self.language_code,
-            "speaker": self.speaker,
-            "model": self.model,
-        }
+    async def _configure_connection(self, connection) -> None:
+        await connection.send(json.dumps({
+            "type": "config", "data": {
+                "language_code": self.language_code, "speaker": self.speaker,
+                "speech_sample_rate": self.sample_rate, "output_audio_codec": "linear16",
+                "min_buffer_size": 50, "max_chunk_length": 200,
+            },
+        }))
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(self.base_url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            audios = data.get("audios", [])
-            if audios:
-                audio_bytes = base64.b64decode(audios[0])
-                # Skip 44-byte WAV header if present to yield raw PCM
-                if audio_bytes.startswith(b"RIFF") and len(audio_bytes) > 44:
-                    audio_bytes = audio_bytes[44:]
+    async def _send_text(self, text: AsyncIterator[str], context_id: str) -> None:
+        async for delta in text:
+            await self._connection.send(json.dumps({"type": "text", "data": {"text": delta}}))
+        await self._connection.send(json.dumps({"type": "flush"}))
 
-                chunk_size = 1024
-                for i in range(0, len(audio_bytes), chunk_size):
-                    yield audio_bytes[i : i + chunk_size]
+    def _decode_message(self, message: str | bytes, context_id: str) -> tuple[bytes, bool]:
+        data = json.loads(message)
+        payload = data.get("data") or {}
+        if data.get("type") == "error":
+            raise RuntimeError(f"Sarvam TTS: {payload}")
+        pcm = base64.b64decode(payload.get("audio") or "", validate=True) if data.get("type") == "audio" else b""
+        return pcm, data.get("type") == "event" and payload.get("event_type") == "final"
 

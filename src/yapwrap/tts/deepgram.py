@@ -1,57 +1,50 @@
-"""Deepgram Aura streaming text-to-speech."""
+"""Deepgram Aura bidirectional streaming text-to-speech."""
 
-import asyncio
+import json
 import logging
 import os
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Optional
 from urllib.parse import urlencode
 
-from yapwrap.core.base import BaseTTS
-
-logger = logging.getLogger("yapwrap.tts.deepgram")
+from yapwrap.core.tts import WebSocketTTS
 
 
-class DeepgramAuraTTS(BaseTTS):
-    """Stream speech from Deepgram Aura TTS."""
+class DeepgramAuraTTS(WebSocketTTS):
+    """Use Speak/Flush on a persistent socket instead of one HTTP call per phrase."""
 
     def __init__(
-        self,
-        api_key: Optional[str] = None,
-        model: str = "aura-asteria-en",
-        sample_rate: int = 16000,
+        self, api_key: Optional[str] = None, model: str = "aura-asteria-en",
+        sample_rate: int = 16000, *, context_idle_timeout: float = 0.12,
+        connect_timeout: float = 15.0, response_timeout: float = 30.0,
     ) -> None:
+        super().__init__(sample_rate=sample_rate, context_idle_timeout=context_idle_timeout,
+                         connect_timeout=connect_timeout, response_timeout=response_timeout)
         self.api_key = api_key or os.getenv("DEEPGRAM_API_KEY", "")
         self.model = model
-        self.sample_rate = sample_rate
 
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Synthesize text into raw PCM16 audio chunks."""
-        if not text.strip():
-            return
-
-        try:
-            import httpx
-        except ImportError as exc:
-            raise ImportError("DeepgramAuraTTS requires `pip install httpx`.") from exc
-
+    def _connection_settings(self) -> tuple[str, dict[str, str]]:
         if not self.api_key:
             raise ValueError("DeepgramAuraTTS requires api_key or DEEPGRAM_API_KEY env var.")
+        params = urlencode({"model": self.model, "encoding": "linear16", "sample_rate": self.sample_rate})
+        return f"wss://api.deepgram.com/v1/speak?{params}", {"Authorization": f"Token {self.api_key}"}
 
-        params = {
-            "model": self.model,
-            "encoding": "linear16",
-            "sample_rate": str(self.sample_rate),
-        }
-        url = f"https://api.deepgram.com/v1/speak?{urlencode(params)}"
-        headers = {
-            "Authorization": f"Token {self.api_key}",
-            "Content-Type": "application/json",
-        }
+    async def _send_text(self, text: AsyncIterator[str], context_id: str) -> None:
+        async for delta in text:
+            await self._connection.send(json.dumps({"type": "Speak", "text": delta}))
+        await self._connection.send(json.dumps({"type": "Flush"}))
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            async with client.stream("POST", url, headers=headers, json={"text": text}) as response:
-                response.raise_for_status()
-                async for chunk in response.aiter_bytes(chunk_size=1024):
-                    if chunk:
-                        yield chunk
+    def _decode_message(self, message: str | bytes, context_id: str) -> tuple[bytes, bool]:
+        if isinstance(message, bytes):
+            return message, False
+        data = json.loads(message)
+        kind = data.get("type")
+        detail = data.get("description") or data.get("message") or str(data)
+        if kind == "Error" or (kind == "Warning" and "flush" in str(data).lower()):
+            # In particular, a flush-limit warning has no Flushed acknowledgement.
+            # Surface it immediately instead of leaving the caller waiting silently.
+            raise RuntimeError(f"Deepgram TTS: {detail}")
+        if kind == "Warning":
+            logging.getLogger(__name__).warning("Deepgram TTS: %s", detail)
+        return b"", data.get("type") == "Flushed"
 

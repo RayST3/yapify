@@ -2,13 +2,13 @@
 
 import asyncio
 from collections import deque
+from collections.abc import AsyncGenerator
 from contextlib import aclosing
-from typing import AsyncIterator, Deque, Optional, Set
+from typing import Deque, Optional, Set
 
 from yapwrap.core.audio import AudioReslicer, DEFAULT_SAMPLE_RATE
 from yapwrap.core.events import SessionEvent, TranscriptEvent
 from yapwrap.core.memory import InMemoryHistory
-from yapwrap.core.phrases import stream_phrases
 from yapwrap.core.base import BaseAgent, BaseSTT, BaseTTS, BaseVAD, BaseTransport
 
 
@@ -57,22 +57,38 @@ class VoiceSession:
         self._transcription_task: Optional[asyncio.Task] = None
         self._active_reply_task: Optional[asyncio.Task] = None
         self._tasks: Set[asyncio.Task] = set()
+        self._cancelling: Set[asyncio.Task] = set()
+        # Cleanup can outlive a turn. Keep each stateful component exclusive
+        # without making microphone capture wait for the previous turn.
+        self._stt_lock = asyncio.Lock()
+        self._agent_lock = asyncio.Lock()
+        self._tts_lock = asyncio.Lock()
         self._stop_event = asyncio.Event()
         self._failure: Optional[asyncio.Future] = None
 
-    def _spawn(self, coroutine) -> asyncio.Task:
+    def _spawn(self, coroutine, turn_id: int) -> asyncio.Task:
         task = asyncio.create_task(coroutine)
         self._tasks.add(task)
 
         def finished(done: asyncio.Task) -> None:
             self._tasks.discard(done)
+            self._cancelling.discard(done)
             if not done.cancelled():
                 error = done.exception()
-                if error is not None and self._failure is not None and not self._failure.done():
+                if error is not None and self._is_current(turn_id) and self._failure is not None and not self._failure.done():
                     self._failure.set_result(error)
 
         task.add_done_callback(finished)
         return task
+
+    def _is_current(self, turn_id: int) -> bool:
+        return self._is_running and turn_id == self._turn_id
+
+    def _request_cancel(self, *tasks: Optional[asyncio.Task]) -> None:
+        for task in tasks:
+            if task is not None and not task.done() and task not in self._cancelling:
+                self._cancelling.add(task)
+                task.cancel()
 
     async def run(self) -> None:
         """Run until disconnect, stop(), cancellation, or a provider failure."""
@@ -81,6 +97,21 @@ class VoiceSession:
         self._is_running = True
         self._stop_event.clear()
         self._failure = asyncio.get_running_loop().create_future()
+        try:
+            async with self.tts.session():
+                await self._run_connected()
+        finally:
+            self._is_running = False
+            self._failure.cancel()
+            self._tasks.clear()
+            self._cancelling.clear()
+            self._stt_queue = None
+            self._is_speaking = False
+            self._reslicer.clear()
+            self._preroll.clear()
+            self.vad.reset()
+
+    async def _run_connected(self) -> None:
         input_task = asyncio.create_task(self._receive_audio())
         stop_task = asyncio.create_task(self._stop_event.wait())
         try:
@@ -92,16 +123,8 @@ class VoiceSession:
         finally:
             self._is_running = False
             tasks = {input_task, stop_task, *self._tasks}
-            for task in tasks:
-                task.cancel()
+            self._request_cancel(*tasks)
             await asyncio.gather(*tasks, return_exceptions=True)
-            self._failure.cancel()
-            self._tasks.clear()
-            self._stt_queue = None
-            self._is_speaking = False
-            self._reslicer.clear()
-            self._preroll.clear()
-            self.vad.reset()
 
     async def _receive_audio(self) -> None:
         stream = self.transport.audio_in()
@@ -123,15 +146,10 @@ class VoiceSession:
         if event == "start" and not self._is_speaking:
             self._is_speaking = True
             self._turn_id += 1
-            # Cancel first so no stale audio can follow the stop_playback signal.
-            pending = [task for task in (self._active_reply_task, self._transcription_task) if task is not None and not task.done()]
-            for task in pending:
-                task.cancel()
-            try:
-                await self.transport.stop_playback()
-            finally:
-                if pending:
-                    await asyncio.gather(*pending, return_exceptions=True)
+            # Retire the turn before any await. Provider cleanup runs in the
+            # background; stale output is rejected even if cancellation is slow.
+            self._request_cancel(self._active_reply_task, self._transcription_task)
+            await self.transport.stop_playback()
             await self._emit("speech_started", turn_id=self._turn_id)
             queue: asyncio.Queue = asyncio.Queue()
             for past in self._preroll:
@@ -139,7 +157,7 @@ class VoiceSession:
             self._preroll.clear()
             queue.put_nowait(frame)
             self._stt_queue = queue
-            self._transcription_task = self._spawn(self._run_transcription(queue, self._turn_id))
+            self._transcription_task = self._spawn(self._run_transcription(queue, self._turn_id), self._turn_id)
         elif self._is_speaking:
             self._stt_queue.put_nowait(frame)
             if event == "stop":
@@ -160,7 +178,7 @@ class VoiceSession:
 
     async def _run_transcription(self, queue: asyncio.Queue, turn_id: int) -> None:
         # Capture this turn's queue; a later utterance must never replace it.
-        async def audio_stream() -> AsyncIterator[bytes]:
+        async def audio_stream() -> AsyncGenerator[bytes, None]:
             while True:
                 item = await queue.get()
                 if item is None:
@@ -169,7 +187,9 @@ class VoiceSession:
 
         committed = []
         interim = ""
-        async with aclosing(audio_stream()) as audio:
+        async with self._stt_lock, aclosing(audio_stream()) as audio:
+            if not self._is_current(turn_id):
+                return
             stream = self.stt.transcribe(audio)
             try:
                 async for transcript in stream:
@@ -183,7 +203,7 @@ class VoiceSession:
                     else:
                         interim = transcript
                     text = " ".join([*committed, interim.strip()]).strip()
-                    if self._is_running and turn_id == self._turn_id:
+                    if self._is_current(turn_id):
                         # A provider's final segment is not yet the full turn.
                         await self._emit("transcript", turn_id=turn_id, text=text, is_final=False)
             finally:
@@ -191,10 +211,10 @@ class VoiceSession:
                 if close is not None:
                     await close()
         text = " ".join([*committed, interim.strip()]).strip()
-        if self._is_running and turn_id == self._turn_id and not self._is_speaking:
+        if self._is_current(turn_id) and not self._is_speaking:
             await self._emit("transcript", turn_id=turn_id, text=text, is_final=True)
-            if text:
-                self._active_reply_task = self._spawn(self._run_agent_reply(text, turn_id))
+            if text and self._is_current(turn_id):
+                self._active_reply_task = self._spawn(self._run_agent_reply(text, turn_id), turn_id)
 
     async def _run_agent_reply(self, user_prompt: str, turn_id: int) -> None:
         tokens: asyncio.Queue = asyncio.Queue(maxsize=128)
@@ -204,20 +224,25 @@ class VoiceSession:
 
         async def generate() -> None:
             nonlocal response
-            stream = self.agent.respond(user_prompt)
-            try:
-                async for event in stream:
-                    if event.type == "text_delta" and event.content:
-                        response += event.content
-                        await self._emit("agent_delta", turn_id=turn_id, text=event.content)
-                        await tokens.put(event.content)
-                await tokens.put(None)
-            finally:
-                close = getattr(stream, "aclose", None)
-                if close is not None:
-                    await close()
+            async with self._agent_lock:
+                if not self._is_current(turn_id):
+                    return
+                stream = self.agent.respond(user_prompt)
+                try:
+                    async for event in stream:
+                        if not self._is_current(turn_id):
+                            return
+                        if event.type == "text_delta" and event.content:
+                            response += event.content
+                            await self._emit("agent_delta", turn_id=turn_id, text=event.content)
+                            await tokens.put(event.content)
+                    await tokens.put(None)
+                finally:
+                    close = getattr(stream, "aclose", None)
+                    if close is not None:
+                        await close()
 
-        async def token_stream() -> AsyncIterator[str]:
+        async def token_stream() -> AsyncGenerator[str, None]:
             while True:
                 token = await tokens.get()
                 if token is None:
@@ -225,21 +250,29 @@ class VoiceSession:
                 yield token
 
         async def speak() -> None:
-            async with aclosing(token_stream()) as text:
-                async with aclosing(stream_phrases(text)) as phrases:
-                    async for phrase in phrases:
-                        stream = self.tts.synthesize(phrase)
-                        try:
-                            async for chunk in stream:
-                                await self.transport.send_audio(chunk)
-                        finally:
-                            close = getattr(stream, "aclose", None)
-                            if close is not None:
-                                await close()
+            async with self._tts_lock, aclosing(token_stream()) as text:
+                if not self._is_current(turn_id):
+                    return
+                stream = self.tts.synthesize_stream(text)
+                try:
+                    async for chunk in stream:
+                        if not self._is_current(turn_id):
+                            return
+                        await self.transport.send_audio(chunk)
+                finally:
+                    close = getattr(stream, "aclose", None)
+                    if close is not None:
+                        await close()
 
         tasks = [asyncio.create_task(generate()), asyncio.create_task(speak())]
         try:
-            await asyncio.gather(*tasks)
+            # wait() leaves cancellation to our finally block, so a slow
+            # provider's cleanup is not cancelled a second time by gather().
+            pending = set(tasks)
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    task.result()
             completed = True
             status = "completed"
         except asyncio.CancelledError:

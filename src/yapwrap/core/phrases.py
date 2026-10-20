@@ -2,7 +2,8 @@
 
 import asyncio
 import re
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncGenerator, AsyncIterator
+from typing import Optional
 
 
 def find_phrase_boundary(text: str, max_chars: int = 150, timed_out: bool = False) -> int:
@@ -29,7 +30,7 @@ async def stream_phrases(
     text_stream: AsyncIterator[str],
     max_chars: int = 150,
     max_delay_ms: float = 120.0,
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str, None]:
     """Yield complete phrases from an asynchronous token stream."""
     if max_chars <= 0 or max_delay_ms <= 0:
         raise ValueError("max_chars and max_delay_ms must be positive")
@@ -43,6 +44,11 @@ async def stream_phrases(
 
     try:
         while not exhausted or buffer:
+            # Whitespace left after a phrase must not keep an expired deadline
+            # alive throughout a tool call. Wait for actual text without polling.
+            if not buffer.strip():
+                buffer = ""
+                deadline = None
             if exhausted and not buffer.strip():
                 break
             cut = find_phrase_boundary(buffer, max_chars=max_chars)
@@ -86,4 +92,7 @@ async def stream_phrases(
         if pending is not None and not pending.done():
             pending.cancel()
             await asyncio.gather(pending, return_exceptions=True)
+        close = getattr(iterator, "aclose", None)
+        if close is not None:
+            await close()
 

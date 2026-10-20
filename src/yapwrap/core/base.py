@@ -10,7 +10,8 @@ resources in ``finally`` or ``async with`` when closed or cancelled.
 """
 
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import aclosing, asynccontextmanager
 
 from yapwrap.core.audio import DEFAULT_SAMPLE_RATE
 from yapwrap.core.events import AgentEvent, SessionEvent, TranscriptEvent
@@ -46,7 +47,12 @@ class BaseSTT(ABC):
 
 
 class BaseTTS(ABC):
-    """Turn a phrase of text into speech audio."""
+    """Public TTS contract, with a phrase fallback for complete-text APIs.
+
+    Stateful adapters can extend ManagedTTS, RealtimeTTS, or WebSocketTTS in
+    yapwrap.core.tts to share lifecycle and streaming behavior. Existing custom
+    subclasses need only implement synthesize().
+    """
 
     sample_rate: int = DEFAULT_SAMPLE_RATE
 
@@ -58,6 +64,31 @@ class BaseTTS(ABC):
         yielding it. Do not yield MP3, base64 text, or WAV headers.
         """
         raise NotImplementedError
+
+    @asynccontextmanager
+    async def session(self) -> AsyncGenerator["BaseTTS", None]:
+        """Own provider resources for one voice call; stateless providers need no setup."""
+        yield self
+
+    async def synthesize_stream(self, text: AsyncIterator[str]) -> AsyncIterator[bytes]:
+        """Speak text deltas while the agent is still generating.
+
+        Providers with streaming text input should override this method. The
+        default keeps existing synthesize(str) providers working with bounded
+        phrases. VoiceSession opens session() once around the entire call.
+        """
+        from yapwrap.core.phrases import stream_phrases
+
+        async with aclosing(stream_phrases(text)) as phrases:
+            async for phrase in phrases:
+                stream = self.synthesize(phrase)
+                try:
+                    async for chunk in stream:
+                        yield chunk
+                finally:
+                    close = getattr(stream, "aclose", None)
+                    if close is not None:
+                        await close()
 
 
 class BaseVAD(ABC):

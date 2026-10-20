@@ -14,6 +14,18 @@ class Socket:
         self.sent = []
         self.ready = asyncio.Event()
         self.fail_send = fail_send
+        self.closed = False
+        self._receiver = self.__aiter__()
+
+    def __await__(self):
+        async def connected():
+            return self
+        return connected().__await__()
+
+    @property
+    def state(self):
+        from websockets.protocol import State
+        return State.CLOSED if self.closed else State.OPEN
 
     async def __aenter__(self):
         return self
@@ -29,7 +41,15 @@ class Socket:
             self.ready.set()
 
     async def close(self):
+        self.closed = True
         self.ready.set()
+
+    async def recv(self):
+        from websockets.exceptions import ConnectionClosedError
+        try:
+            return await anext(self._receiver)
+        except StopAsyncIteration:
+            raise ConnectionClosedError(None, None) from None
 
     async def __aiter__(self):
         await self.ready.wait()

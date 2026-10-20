@@ -5,6 +5,7 @@ from yapwrap.core.yapwrap import YapWrap
 from yapwrap.core.protocols import Transport, VAD, STT, Agent, TTS, SessionEventSink
 from yapwrap.core.events import AgentEvent, SessionEvent, TranscriptEvent
 from yapwrap.core.session import VoiceSession
+from yapwrap.core.tts import ManagedTTS, RealtimeTTS, WebSocketTTS
 from yapwrap.core.memory import InMemoryHistory, ConversationTurn
 
 # Yapper is an alias for YapWrap
@@ -14,6 +15,9 @@ __all__ = [
     "BaseAgent",
     "BaseSTT",
     "BaseTTS",
+    "ManagedTTS",
+    "RealtimeTTS",
+    "WebSocketTTS",
     "BaseVAD",
     "BaseTransport",
     "YapWrap",

@@ -120,6 +120,69 @@ def mulaw_to_pcm16(data: bytes) -> bytes:
     return bytes(out)
 
 
+class PCM16Stream:
+    """Align arbitrary byte chunks and resample without resetting at each chunk.
+
+    Linear interpolation retains its fractional position and final input sample
+    between calls. finish() emits the remaining samples and rejects odd tails.
+    """
+
+    def __init__(self, from_rate: int, to_rate: int) -> None:
+        if from_rate <= 0 or to_rate <= 0:
+            raise ValueError("Sample rates must be positive")
+        self.from_rate, self.to_rate = from_rate, to_rate
+        self._buffer = bytearray()
+        self._offset = 0
+        self._position = 0
+
+    def process(self, chunk: bytes) -> bytes:
+        self._buffer.extend(chunk)
+        return self._convert(final=False)
+
+    def finish(self) -> bytes:
+        if len(self._buffer) % 2:
+            raise ValueError("Provider returned an incomplete PCM16 sample")
+        return self._convert(final=True)
+
+    def _convert(self, *, final: bool) -> bytes:
+        size = len(self._buffer) // 2
+        if self.from_rate == self.to_rate:
+            pcm = bytes(self._buffer[:size * 2])
+            del self._buffer[:size * 2]
+            return pcm
+        total = self._offset + size
+        output = bytearray()
+        target_count = total * self.to_rate // self.from_rate
+        while size:
+            index, fraction = divmod(self._position, self.to_rate)
+            if self._position >= target_count * self.from_rate:
+                break
+            if not final and index + 1 >= total:
+                break
+            local = index - self._offset
+            left = struct.unpack_from("<h", self._buffer, min(local, size - 1) * 2)[0]
+            right = struct.unpack_from("<h", self._buffer, min(local + 1, size - 1) * 2)[0]
+            value = int(left + (right - left) * fraction / self.to_rate)
+            output.extend(struct.pack("<h", value))
+            self._position += self.from_rate
+        # Retain the sample needed to interpolate across the next chunk boundary.
+        drop = min(max(0, self._position // self.to_rate - self._offset), max(0, size - 1))
+        del self._buffer[:drop * 2]
+        self._offset += drop
+        return bytes(output)
+
+
+def wav_to_pcm16(audio: bytes, sample_rate: int) -> bytes:
+    """Decode a complete PCM WAV using its actual chunks, not a fixed header size."""
+    import io
+    import wave
+
+    with wave.open(io.BytesIO(audio), "rb") as wav:
+        if wav.getnchannels() != 1 or wav.getsampwidth() != 2:
+            raise ValueError("Expected mono PCM16 WAV audio")
+        return resample_pcm(wav.readframes(wav.getnframes()), wav.getframerate(), sample_rate)
+
+
 def pcm16_to_mulaw(pcm: bytes) -> bytes:
     """Encode 16-bit PCM audio to 8-bit G.711 mu-law."""
     num_samples = len(pcm) // 2
